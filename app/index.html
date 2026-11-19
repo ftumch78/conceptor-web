@@ -16,12 +16,17 @@
 </head>
 <body>
 <div id="app"></div>
-<div id="banner"></div>
-<div id="dialog"></div>
+<div id="pop" class="popup"></div>
+<div id="dialog" class="dlg"></div>
+<div id="dialog2" class="dlg"></div>
+<div id="tip" class="tip" role="dialog"><h4 id="tipT"></h4><p id="tipP"></p><button class="hex" data-act="got-it"><span>Got it</span></button></div>
+<div id="banner" role="status"></div>
+<input type="file" id="file" accept="audio/*" hidden>
 <noscript>Conceptor needs JavaScript switched on.</noscript>
 <script src="lame.min.js"></script>
 <script src="engine.js"></script>
 <script src="studio.js"></script>
+<script src="editor.js"></script>
 <script src="ui.js"></script>
 </body>
 </html>

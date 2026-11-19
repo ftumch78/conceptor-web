@@ -66,12 +66,13 @@ CZ.DRUM_PATTERNS = [
 CZ.newSong = function (name) {
   const tracks = [];
   for (let t = 0; t < CZ.TRACKS; t++) {
-    tracks.push({ name: 'Track ' + (t + 1), vol: 0, pan: 0, trim: 0, mute: false, solo: false, arm: false,
+    tracks.push({ name: 'Track ' + (t + 1), vol: 0, pan: 0, trim: 0, mute: false, solo: false, arm: false, fi: 0, fo: 0,
       fx: CZ.UNITS.map((_, u) => ({ on: false, variant: 0, vals: CZ.defaults(u, 0) })), audio: null });
   }
   return {
     name, tracks, shown: 4, masterVol: 0, bpm: 100, click: false, loop: false, loopStart: 0, loopEnd: 0,
-    drums: { on: false, vol: -6, steps: CZ.DRUM_PATTERNS[0].map(() => new Array(16).fill(false)) },
+    drums: { on: false, vol: -6, steps: CZ.DRUM_PATTERNS[0].map(() => new Array(16).fill(false)), samples: [null, null, null, null, null, null] },
+    exports: [], created: CZ.today(),
     master: { on: false, gain: 3, ceiling: -1, eq: { on: false, variant: 0, vals: CZ.defaults(4, 0) },
       comp: { on: true, variant: 1, vals: [25, 2, 1] } },
   };
@@ -356,4 +357,71 @@ CZ.encodeMp3 = function (channels, sr) {
   }
   const end = enc.flush(); if (end.length) parts.push(new Uint8Array(end));
   return new Blob(parts, { type: 'audio/mpeg' });
+};
+
+// ------------------------------------------------------------------ 0.3: names, fades, peaks, editing
+CZ.VERSION = '0.3';
+CZ.MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+CZ.today = () => { const d = new Date(); return d.getDate() + ' ' + CZ.MONTHS[d.getMonth()] + ' ' + d.getFullYear(); };
+CZ.uniqueName = (base, list) => { if (!list.includes(base)) return base; let k = 2; while (list.includes(base + ' (' + k + ')')) k++; return base + ' (' + k + ')'; };
+CZ.cleanFile = (x) => String(x).replace(/[\\/:*?"<>|]/g, '_').trim() || 'Untitled';
+
+// a copy with fade in and fade out applied (seconds); the same array when there are no fades
+CZ.faded = function (a, fi, fo, sr) {
+  if (!a || (!(fi > 0) && !(fo > 0))) return a;
+  const out = a.slice(), n = a.length;
+  const nfi = Math.min(n, Math.round((fi || 0) * sr)), nfo = Math.min(n, Math.round((fo || 0) * sr));
+  for (let i = 0; i < nfi; i++) out[i] *= i / nfi;
+  for (let i = 0; i < nfo; i++) out[n - 1 - i] *= i / nfo;
+  return out;
+};
+CZ.trackAudio = (t, sr) => CZ.faded(t.audio, t.fi, t.fo, sr);
+
+// largest level in each block of `bin` samples, across all channels
+CZ.peaks = function (chs, bin) {
+  const n = chs[0].length, m = Math.ceil(n / bin), p = new Float32Array(m);
+  for (const c of chs) for (let k = 0; k < m; k++) { let mx = p[k]; const e = Math.min(n, (k + 1) * bin); for (let i = k * bin; i < e; i++) { const v = c[i] < 0 ? -c[i] : c[i]; if (v > mx) mx = v; } p[k] = mx; }
+  return p;
+};
+CZ.concat = (parts) => { let n = 0; for (const p of parts) n += p.length; const o = new Float32Array(n); let k = 0; for (const p of parts) { o.set(p, k); k += p.length; } return o; };
+
+CZ.TIPS = {
+  menu: ['Menu', 'All the main parts of Conceptor are here.'],
+  songname: ['Song name', 'Tap the name to rename the song. New songs are called "Untitled" plus the date until they are named.'],
+  master: ['Master', 'Volume of the whole mix. The two bars show the left and right level.'],
+  tracks: ['Tracks', 'Each row is one track. R arms it for recording, M mutes it, S solos it. FX opens its effects. The hexagon with three dots has Import Audio, Edit, Copy To Song and Rename.'],
+  addtrack: ['Add track', 'Adds another track. Up to 12.'],
+  transport: ['Transport', 'Rewind, Play or Stop, Record, Loop and Click. Record needs a track with R on.'],
+  shortcuts: ['Shortcuts', 'Open Edit Mode, the drum grid, mastering, export, the Library and the Ultrasound Machine.'],
+  edit: ['Edit Mode', 'Trim, insert silence, fade and re-record part of the audio on any track.'],
+  edtools: ['Editing tools', 'Pick a tool, then use it on the wave. Play listens to the result. Undo reverses the last edit, as many times as needed.'],
+  dropin: ['Drop In', 'Re-records one part of a track. Drag over the part, press Record Drop In and play along after the 2-second count-in. Keep or Discard the new take.'],
+  silence: ['Insert Silence', 'Tap Point adds silence at one spot. Paint silences a part painted over with a finger or the mouse. Nothing changes until Apply is pressed.'],
+  zoom: ['Zoom', 'Pinch the wave, use + and −, or hold Ctrl and turn the mouse wheel. When zoomed in, drag the wave or the slider to move along it.'],
+  track: ['Track screen', 'Name, levels, Import Audio and the eight effects for this track.'],
+  levels: ['Levels', 'Input gain sets how loud the recording comes in. Volume and Pan set where the track sits in the mix.'],
+  effects: ['Effects', 'The sound passes through these in order, top to bottom. Switch one on with its switch. Tap its name to open its controls.'],
+  importaudio: ['Import Audio', 'Puts an audio file at the start of this track, replacing what is there. Undo last take puts the old audio back.'],
+  export: ['Export', 'Saves the whole mix or each track as a file in the Library, one question at a time.'],
+  exedit: ['Edit the mix', 'Trim, insert silence or fade the finished mix before it is saved. The song itself does not change.'],
+  lib: ['Library', 'Every song is a folder holding its tracks and exported mixes. They always stay together.'],
+  libloc: ['Library location', 'Where the Library is kept: in this browser, or also in a folder that OneDrive or Google Drive keeps in sync.'],
+  sync: ['Sync Library', 'Copies the Library to the chosen folder and brings in songs found there. Nothing is deleted.'],
+  folder: ['Song folder', 'Holds this song\'s exported mixes and all its tracks. Copy To Song puts a copy of a track into another song.'],
+  um: ['Ultrasound Machine', 'Plays working mixes and final mixes. A mix can be exported or shared from here.'],
+  tabs: ['Working and Final Mixes', 'Working Mixes are songs still in progress. Final Mixes are mixes that have been exported.'],
+  skip: ['Skip 10 seconds', 'Moves back or forward 10 seconds. Tap the wave to jump to a point.'],
+  loop: ['Loop and Volume', 'Loop plays the mix again from the start when it ends. Volume only changes playback, not the file.'],
+  umactions: ['Export, Share, Library', 'Export saves the mix as a file. Share sends it to another app, such as Instagram, email or VLC. Open Library shows all songs.'],
+  drums: ['Gillian and Stephen', 'A 16-step drum grid that follows the click tempo. Tap a square to turn a hit on or off.'],
+  drumrow: ['Drum sounds', 'Tap a sound name to listen to it, import an audio file for it, edit it, or go back to the built-in sound.'],
+  drumimport: ['Import Audio', 'Replaces one drum sound with an audio file. Press Listen to hear a file before using it. Reset Sound puts the built-in one back.'],
+  patterns: ['Patterns', 'Starting patterns. Choosing one replaces the grid.'],
+  mastering: ['Mastering', 'EQ, compressor and limiter on the whole mix. Heard when playing and included in the exported mix.'],
+  limiter: ['Limiter', 'Loudness makes the mix louder. Ceiling is the highest level allowed. -1 dB is a safe ceiling.'],
+  tempo: ['Tempo, click and loop', 'Tempo sets the speed of the click and the drums. Loop plays one part again and again.'],
+  io: ['Input and output', 'Choose what to record from. Recording delay lines new recordings up with the rest of the song.'],
+  home: ['Home', 'Goes back to the main Conceptor screen from anywhere. Closes any open pop-up and stops playback.'],
+  hh: ['Hand Hold', 'Shows the small (i) buttons that explain each feature. Turn it off when they are no longer needed.'],
+  undo: ['Undo last take', 'Puts back what was on the track before the last recording or import.'],
 };
