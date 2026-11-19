@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conceptor: get the app</title>
+<meta name="theme-color" content="#111113">
+<link rel="icon" href="img/icon.png">
+<link rel="apple-touch-icon" href="app/icon-180.png">
+<style>
+  :root { --gold:#E8C872; --bg:#111113; --panel:#1C1D21; --ink:#ECEBE6; --dim:#9A988F; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:17px/1.45 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  main { max-width:640px; margin:0 auto; padding:24px 18px 60px; }
+  header { text-align:center; }
+  header img { width:150px; }
+  h1 { color:var(--gold); letter-spacing:5px; margin:4px 0; font-size:32px; }
+  h2 { font-size:22px; margin:0 0 6px; }
+  .sub { color:var(--dim); margin:0 0 20px; }
+  .big { display:block; text-align:center; background:var(--gold); color:#111; font-weight:700; text-decoration:none; padding:16px; border-radius:12px; font-size:19px; margin:12px 0; }
+  .choose button { display:block; width:100%; margin:8px 0; padding:15px; font:inherit; font-weight:600; background:var(--panel); color:var(--ink); border:1px solid #3A3B42; border-radius:12px; cursor:pointer; text-align:left; }
+  .choose button span { color:var(--dim); font-weight:400; font-size:14px; display:block; }
+  .step { display:none; background:var(--panel); border-radius:14px; padding:18px; }
+  .step.on { display:block; }
+  .count { color:var(--gold); font-size:13px; letter-spacing:1px; margin-bottom:6px; }
+  .step ul { padding-left:20px; margin:10px 0; } .step li { margin:6px 0; }
+  .step img { display:block; max-width:100%; max-height:430px; margin:12px auto; border-radius:10px; }
+  .nav { display:flex; justify-content:space-between; gap:10px; margin-top:12px; }
+  .nav button { flex:1; padding:13px; font:inherit; font-weight:600; border-radius:10px; border:1px solid #3A3B42; background:#26272C; color:var(--ink); cursor:pointer; }
+  .nav .next { background:var(--gold); color:#111; border-color:var(--gold); }
+  .nav button:disabled { opacity:.35; }
+  .note { color:var(--dim); font-size:14px; }
+  .shots { display:flex; gap:8px; overflow-x:auto; margin:18px 0; } .shots img { height:300px; border-radius:10px; }
+  a { color:var(--gold); }
+  .orange { background:#FF6B00; color:#fff; border-radius:50%; display:inline-block; width:22px; height:22px; text-align:center; font-size:13px; line-height:22px; font-weight:700; }
+</style>
+</head>
+<body>
+<main>
+<header>
+  <img src="app/art.jpg" alt="">
+  <h1>CONCEPTOR</h1>
+  <p class="sub">Record ideas. Twelve tracks, with amps, pedals, effects, a drum grid and mastering built in. Version 0.2.</p>
+</header>
+
+<a class="big" href="app/">Open Conceptor</a>
+<p class="note">Works in the browser on iPhone, iPad, Android phones, Mac and PC. Add it to the home screen to use it like an app.</p>
+
+<div class="shots"><img src="img/mix.jpg" alt="Mix screen"><img src="img/track.jpg" alt="Track screen"><img src="img/drums.jpg" alt="Drum grid"><img src="img/mastering.jpg" alt="Mastering"></div>
+
+<section id="pick" class="choose">
+  <h2>Put Conceptor on your device</h2>
+  <p class="note">Choose your device. The steps show one at a time.</p>
+  <button data-go="ios">iPhone or iPad<span>Add to the home screen from Safari</span></button>
+  <button data-go="android">Android phone<span>The Android app, or the web app from Chrome</span></button>
+  <button data-go="computer">Mac or PC<span>Install from Chrome or Edge, or add to the Dock in Safari</span></button>
+</section>
+
+<section id="ios" hidden>
+  <div class="step"><div class="count">IPHONE AND IPAD · STEP 1 OF 6</div><h2>Open this page in Safari</h2>
+    <ul><li>Use the <b>Safari</b> app (the blue compass).</li><li>Go to <b>ftumch78.github.io/conceptor-web</b></li><li>If you are already in Safari, carry on.</li></ul>
+    <img src="img/ios_open.svg" alt="Safari with the page open"></div>
+  <div class="step"><div class="count">IPHONE AND IPAD · STEP 2 OF 6</div><h2>Open Conceptor</h2>
+    <ul><li>Tap the gold <b>Open Conceptor</b> button at the top of this page.</li><li>The Conceptor start screen opens.</li></ul></div>
+  <div class="step"><div class="count">IPHONE AND IPAD · STEP 3 OF 6</div><h2>Tap the Share button</h2>
+    <ul><li>It is the square with an arrow pointing up <span class="orange">1</span>.</li><li>iPhone: at the bottom of the screen. iPad: at the top right.</li></ul>
+    <img src="img/ios_share.svg" alt="Share button in Safari"></div>
+  <div class="step"><div class="count">IPHONE AND IPAD · STEP 4 OF 6</div><h2>Tap Add to Home Screen</h2>
+    <ul><li>Scroll down the list if you cannot see it.</li><li>Tap <b>Add to Home Screen</b> <span class="orange">1</span>.</li></ul>
+    <img src="img/ios_menu.svg" alt="Add to Home Screen in the share list"></div>
+  <div class="step"><div class="count">IPHONE AND IPAD · STEP 5 OF 6</div><h2>Tap Add</h2>
+    <ul><li>Leave the name as <b>Conceptor</b>.</li><li>Tap <b>Add</b> at the top right <span class="orange">1</span>.</li></ul>
+    <img src="img/ios_add.svg" alt="Add to Home Screen confirmation"></div>
+  <div class="step"><div class="count">IPHONE AND IPAD · STEP 6 OF 6</div><h2>Start Conceptor from the home screen</h2>
+    <ul><li>Tap the new <b>Conceptor</b> icon <span class="orange">1</span>. It opens full screen, like an app.</li>
+      <li>The first time you record, tap <b>Allow</b> for the microphone.</li>
+      <li>Switch off Silent mode (the switch or Action button on the side), or Conceptor plays no sound.</li>
+      <li>Wear headphones when recording.</li></ul>
+    <img src="img/ios_home.svg" alt="Conceptor icon on the home screen"></div>
+</section>
+
+<section id="android" hidden>
+  <div class="step"><div class="count">ANDROID · STEP 1 OF 3</div><h2>Choose: the Android app or the web app</h2>
+    <ul><li><b>Android app</b>: best timing for recording. Needs Android 8.0 or later. Download it from the GitHub release page (you need to be signed in to GitHub with access to the Conceptor repository).</li>
+      <li><b>Web app</b>: no download needed. Works in Chrome.</li></ul>
+    <a class="big" href="https://github.com/ftumch78/Conceptor-Android-0.1/releases/latest">Android app: download page</a>
+    <p class="note">Full Android install steps are in the Conceptor install guide.</p></div>
+  <div class="step"><div class="count">ANDROID · STEP 2 OF 3</div><h2>Web app: open Conceptor in Chrome</h2>
+    <ul><li>Open <b>Chrome</b> on the phone.</li><li>Go to <b>ftumch78.github.io/conceptor-web</b></li><li>Tap <b>Open Conceptor</b>.</li></ul></div>
+  <div class="step"><div class="count">ANDROID · STEP 3 OF 3</div><h2>Web app: add it to the home screen</h2>
+    <ul><li>Tap the three dots at the top right of Chrome.</li><li>Tap <b>Add to Home screen</b> or <b>Install app</b>.</li><li>Tap <b>Install</b>.</li><li>Start Conceptor from its new icon.</li></ul></div>
+</section>
+
+<section id="computer" hidden>
+  <div class="step"><div class="count">MAC OR PC · STEP 1 OF 3</div><h2>Open Conceptor in Chrome or Edge</h2>
+    <ul><li>Go to <b>ftumch78.github.io/conceptor-web</b></li><li>Click <b>Open Conceptor</b>.</li></ul></div>
+  <div class="step"><div class="count">MAC OR PC · STEP 2 OF 3</div><h2>Click the Install icon</h2>
+    <ul><li>Click the small install icon at the right end of the address bar <span class="orange">1</span>.</li>
+      <li>Click <b>Install</b> <span class="orange">2</span>.</li>
+      <li>Conceptor gets its own window and an icon in the Dock (Mac) or Start menu (PC).</li></ul>
+    <img src="img/chrome_install.svg" alt="Install icon in Chrome"></div>
+  <div class="step"><div class="count">MAC OR PC · STEP 3 OF 3</div><h2>Safari on a Mac</h2>
+    <ul><li>macOS Sonoma or later: open Conceptor in Safari, then <b>File</b>, <b>Add to Dock</b>.</li>
+      <li>Older Macs (for example Catalina): use Conceptor in a Safari or Chrome window. Keep a bookmark to it.</li>
+      <li>Allow the microphone when asked.</li></ul></div>
+</section>
+
+<div class="nav" id="nav" hidden><button id="back">Back</button><button id="next" class="next">Next</button></div>
+
+<p class="note" style="margin-top:30px">Songs are kept in the browser on each device. Use Export to keep copies of your recordings. Conceptor uses the LAME encoder (lame.sourceforge.net) for MP3 export.</p>
+</main>
+<script>
+  let sec = null, i = 0;
+  const show = () => {
+    document.querySelectorAll('section').forEach((s) => (s.hidden = s.id !== (sec || 'pick')));
+    document.getElementById('nav').hidden = !sec;
+    if (!sec) return;
+    const steps = document.querySelectorAll('#' + sec + ' .step');
+    steps.forEach((s, k) => s.classList.toggle('on', k === i));
+    document.getElementById('next').textContent = i === steps.length - 1 ? 'Done' : 'Next';
+    document.getElementById('back').textContent = i === 0 ? 'Choose another device' : 'Back';
+  };
+  document.querySelectorAll('[data-go]').forEach((b) => b.onclick = () => { sec = b.dataset.go; i = 0; show(); document.getElementById(sec).scrollIntoView({ behavior: 'smooth' }); });
+  document.getElementById('next').onclick = () => { const n = document.querySelectorAll('#' + sec + ' .step').length; if (i < n - 1) i++; else { sec = null; } show(); };
+  document.getElementById('back').onclick = () => { if (i > 0) i--; else sec = null; show(); };
+  if (/iPhone|iPad|Macintosh/.test(navigator.userAgent) && 'ontouchend' in document) { /* iPhone or iPad */ }
+  show();
+</script>
+</body>
+</html>
