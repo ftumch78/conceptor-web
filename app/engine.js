@@ -84,39 +84,60 @@ CZ.applyPreset = function (song, k) {
 };
 
 // ------------------------------------------------------------------ 0.4 drum programmer: patterns, compile row, placeholder, sound knobs
-CZ.COLOURS = ['#E8C872', '#D99A4A', '#C96F4A', '#B85C6E', '#9B6BB0', '#6E7FC4', '#4F9BB8', '#4FB5A0', '#7DB85A', '#B4B84F', '#D2A24C', '#A68B6A'];
-CZ.PCOL = [0, 6, 4, 8, 3, 5, 7, 2].map((i) => CZ.COLOURS[i]);   // gold, blue-teal, purple, green, rose, blue, teal, rust
+// Birthing Unit track colours (Theme.h: mint, blush, lavender, butter, sky, peach), then orange and gold from the colour brief; repeat after 8
+CZ.TRACKCOL = ['#9AD6C5', '#E5AAB9', '#B9AAE0', '#F0D68C', '#A2C9E8', '#EAB592', '#E9A97D', '#DCB74F'];
+CZ.COLOURS = CZ.TRACKCOL;
+CZ.PCOL = CZ.TRACKCOL;   // pattern colours follow the track colours
+// drum hits: Birthing Unit drum lane colours (DrumView.h: peach, sky, blush, mint, butter, lavender, sky, gold), shown at 75%
+CZ.LANECOL = ['#EAB592', '#A2C9E8', '#E5AAB9', '#9AD6C5', '#F0D68C', '#B9AAE0', '#A2C9E8', '#E2BF6A'];
 CZ.KNOBS = ['Pitch', 'Tone', 'Length', 'Level'];
 CZ.emptySteps = () => Array.from({ length: CZ.NDRUMS }, () => new Array(16).fill(false));
-CZ.newDrums = () => ({ vol: -6, patterns: [{ id: 1, name: 'Pattern 1', color: CZ.PCOL[0], ph: false, steps: CZ.emptySteps() }], nextId: 2, sel: 1,
+CZ.newDrums = () => ({ vol: -6, patterns: [{ id: 1, name: 'Pattern 1', color: CZ.PCOL[0], ph: false, bars: 4, steps: CZ.emptySteps() }], nextId: 2, sel: 1,
   comp: [], phLen: 240, knobs: Array.from({ length: CZ.NDRUMS }, () => [50, 50, 50, 80]), samples: new Array(CZ.NDRUMS).fill(null) });
-CZ.newPattern = (d, steps) => { const id = d.nextId++; const p = { id, name: 'Pattern ' + id, color: CZ.PCOL[(id - 1) % CZ.PCOL.length], ph: false, steps: steps || CZ.emptySteps() }; d.patterns.push(p); return p; };
+CZ.newPattern = (d, steps) => { const id = d.nextId++; const p = { id, name: 'Pattern ' + id, color: CZ.PCOL[(id - 1) % CZ.PCOL.length], ph: false, bars: 4, steps: steps || CZ.emptySteps() }; d.patterns.push(p); return p; };
 CZ.pat = (d, id) => d.patterns.find((x) => x.id === id);
 CZ.selPattern = (song) => CZ.pat(song.drums, song.drums.sel) || song.drums.patterns[0];
-CZ.barSec = (song) => 4 * 60 / Math.max(30, song.bpm);
-CZ.rowSec = (song) => song.drums.comp.length * CZ.barSec(song);
-CZ.phBars = (song) => Math.ceil(song.drums.phLen / CZ.barSec(song) - 1e-9);
+// 0.4.1: on the grid one bar = a group of 4 squares; each square is a sixteenth note. A pattern is 2 or 4 bars (8 or 16 squares).
+CZ.STEPS_PER_BAR = 4;
+CZ.stepSec = (song) => 60 / Math.max(30, song.bpm) / 4;
+CZ.patSteps = (p) => (p && p.bars === 2 ? 2 : 4) * CZ.STEPS_PER_BAR;
+CZ.patSec = (song, p) => CZ.patSteps(p) * CZ.stepSec(song);
+CZ.blockSteps = (song, b) => CZ.patSteps(CZ.pat(song.drums, b.p));
+CZ.rowSteps = (song) => song.drums.comp.reduce((t, b) => t + CZ.blockSteps(song, b), 0);
+CZ.rowSec = (song) => CZ.rowSteps(song) * CZ.stepSec(song);
+// the block playing at a step of the row: { i, st } or null after the end
+CZ.blockAt = (song, step) => { let t = 0; const c = song.drums.comp; for (let i = 0; i < c.length; i++) { const n = CZ.blockSteps(song, c[i]); if (step < t + n) return { i, st: step - t }; t += n; } return null; };
+CZ.blockStart = (song, i) => { let t = 0; for (let k = 0; k < i; k++) t += CZ.blockSteps(song, song.drums.comp[k]); return t; };
 CZ.placeholder = (song) => song.drums.patterns.find((x) => x.ph) || null;
+// number of placeholder-sized blocks that make the song length
+CZ.phBars = (song) => { const p = CZ.placeholder(song); return p ? Math.ceil(song.drums.phLen / CZ.patSec(song, p) - 1e-9) : 0; };
 // fills the row with placeholder blocks up to the song length. Real blocks stay where they are.
 CZ.fillPh = (song) => {
   const d = song.drums, p = CZ.placeholder(song);
   if (!p) { d.comp = d.comp.filter((b) => !b.ph); return; }
   d.comp.forEach((b) => { if (b.ph) b.p = p.id; });
-  while (d.comp.length < CZ.phBars(song)) d.comp.push({ p: p.id, ph: true });
   CZ.trimPh(song);
+  while (CZ.rowSec(song) < d.phLen - 0.01 && d.comp.length < 4000) d.comp.push({ p: p.id, ph: true });
 };
 // keeps the row at the song length when real blocks are put in
-CZ.trimPh = (song) => { const d = song.drums; if (!CZ.placeholder(song)) return; let extra = d.comp.length - CZ.phBars(song); for (let i = d.comp.length - 1; i >= 0 && extra > 0; i--) if (d.comp[i].ph) { d.comp.splice(i, 1); extra--; } };
+CZ.trimPh = (song) => {
+  const d = song.drums; if (!CZ.placeholder(song)) return;
+  for (let i = d.comp.length - 1; i >= 0; i--) { if (!d.comp[i].ph) continue; if (CZ.rowSec(song) - CZ.blockSteps(song, d.comp[i]) * CZ.stepSec(song) >= d.phLen - 0.01) d.comp.splice(i, 1); else break; }
+};
 
 // songs from 0.3 and earlier: one 6-sound grid that repeated while the drums were on
 CZ.migrateDrums = function (song, songSeconds) {
   const d = song.drums || {};
-  if (d.patterns) { if (!d.knobs) d.knobs = Array.from({ length: CZ.NDRUMS }, () => [50, 50, 50, 80]); while ((d.samples || (d.samples = [])).length < CZ.NDRUMS) d.samples.push(null); return; }
+  if (d.patterns) {   // 0.4 songs: 16-step patterns are 4 bars of 4 squares; colours follow the new scheme
+    if (!d.knobs) d.knobs = Array.from({ length: CZ.NDRUMS }, () => [50, 50, 50, 80]); while ((d.samples || (d.samples = [])).length < CZ.NDRUMS) d.samples.push(null);
+    d.patterns.forEach((p) => { if (p.bars !== 2 && p.bars !== 4) p.bars = 4; p.color = CZ.PCOL[(p.id - 1) % CZ.PCOL.length]; });
+    return;
+  }
   const nd = CZ.newDrums();
   if (d.steps) d.steps.forEach((row, v) => row.forEach((on, i) => { if (v < CZ.NDRUMS) nd.patterns[0].steps[v][i] = !!on; }));
   if (d.samples) d.samples.forEach((x, v) => { if (v < CZ.NDRUMS) nd.samples[v] = x; });
   if (typeof d.vol === 'number') nd.vol = d.vol;
-  if (d.on) { const bars = Math.max(4, Math.ceil(songSeconds / (4 * 60 / Math.max(30, song.bpm || 100)))); for (let i = 0; i < bars; i++) nd.comp.push({ p: 1 }); }
+  if (d.on) { const bars = Math.max(4, Math.ceil(songSeconds / (4 * 60 / Math.max(30, song.bpm || 100)))); for (let i = 0; i < bars; i++) nd.comp.push({ p: 1 }); }   // one block = 16 squares = one old grid
   song.drums = nd;
 };
 
@@ -422,7 +443,7 @@ CZ.encodeMp3 = function (channels, sr) {
 };
 
 // ------------------------------------------------------------------ 0.3: names, fades, peaks, editing
-CZ.VERSION = '0.4';
+CZ.VERSION = '0.4.1';
 CZ.MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 CZ.today = () => { const d = new Date(); return d.getDate() + ' ' + CZ.MONTHS[d.getMonth()] + ' ' + d.getFullYear(); };
 CZ.uniqueName = (base, list) => { if (!list.includes(base)) return base; let k = 2; while (list.includes(base + ' (' + k + ')')) k++; return base + ' (' + k + ')'; };
@@ -476,9 +497,10 @@ CZ.TIPS = {
   skip: ['Skip 10 seconds', 'Moves back or forward 10 seconds. Tap the wave to jump to a point.'],
   loop: ['Loop and Volume', 'Loop plays the mix again from the start when it ends. Volume only changes playback, not the file.'],
   umactions: ['Export, Share, Library', 'Export saves the mix as a file. Share sends it to another app, such as Instagram, email or VLC. Open Library shows all songs.'],
-  drums: ['Gillian and Stephen', 'The drum programmer. Make patterns at the top, then put them in order in the row at the bottom. The drums follow the click tempo.'],
+  drums: ['Gillian and Stephen', 'The drum programmer. Pattern cards at the top, the song row under them, and the editor for the selected pattern at the bottom. The drums follow the click tempo.'],
   mode: ['Demo and Polished', 'Demo Mode is for capturing ideas quickly. Polished Mode adds mastering and the full export, for tracks being prepared for release. Change it in the Menu.'],
   patternedit: ['Pattern Edit', 'Make drum patterns here. Tap a square to add or remove a hit. Each pattern has its own colour and name. Tap ⋯ to rename, duplicate or delete it.'],
+  bars: ['Number of bars', 'Sets how long this pattern is: 2 or 4 bars. The grid shows 2 bars at a time. With 4 bars, use the switch to show bars 1 and 2, or bars 3 and 4.'],
   knobs: ['Sound controls', 'Tap a sound name on the left of the grid, then drag a knob up or down. Changes affect that sound in every pattern.'],
   ph: ['Placeholder', 'Fills the whole song row with this pattern, 4 minutes long. Change the length under the tick box. Drop other patterns onto the striped blocks later to replace them.'],
   comp: ['Pattern Compile', "The song's drum track. Drag a pattern card down into this row, or use Add to row. Tap a block to select it for Repeat or Remove. Hold a block to move it, or drag it out of the row to remove it."],

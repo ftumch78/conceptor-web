@@ -85,11 +85,15 @@ class WaveEditor {
     if (this.ph >= 0) { const pi = this.ph * this.sr; if (pi < this.view || pi > this.view + vis) this.view = Math.round(pi - vis * 0.1); }
     this.view = Math.max(0, Math.min(Math.max(0, n - vis), this.view));
     const spp = vis / W, X = (i) => (i - this.view) / spp;
-    g.fillStyle = '#1C1D21'; g.fillRect(0, 0, W, H);
+    // Birthing Unit clip: dark box, clip body in the track colour at 16%, a title bar at 78%, wave in the track colour
+    const col = this.o.colour || '#E2BF6A';
+    g.fillStyle = '#121316'; g.fillRect(0, 0, W, H);
+    g.fillStyle = col + '29'; g.fillRect(X(0), 0, Math.max(0, X(n) - X(0)), H);
+    g.fillStyle = col + 'C7'; g.fillRect(X(0), 0, Math.max(0, X(n) - X(0)), 8);
     const p = this.pending;
     if (p) {
       const recNow = this.recording && this.ph * this.sr >= p.a;
-      g.fillStyle = recNow ? 'rgba(229,72,77,.55)' : p.kind === 'drop' && p.take ? 'rgba(88,194,125,.30)' : 'rgba(229,72,77,.28)';
+      g.fillStyle = recNow ? 'rgba(227,36,43,.55)' : p.kind === 'drop' && p.take ? 'rgba(154,214,197,.30)' : 'rgba(227,36,43,.28)';
       const b = p.kind === 'tap' ? p.a + p.len : p.b;
       g.fillRect(X(p.a), 0, Math.max(3, X(b) - X(p.a)), H);
     }
@@ -103,15 +107,15 @@ class WaveEditor {
       const v = Math.min(1, this.plvl(i0, i1) * e), bh = Math.max(1.5, v * H * 0.9);
       const out = this.tool === 'trim' && (i0 < this.a || i0 >= this.b);
       const inDropTake = p && p.kind === 'drop' && p.take && i0 >= p.a && i0 < p.b;
-      g.fillStyle = out ? '#3a3b40' : inDropTake ? '#58C27D' : '#E8C872';
+      g.fillStyle = out ? '#3A3C42' : inDropTake ? '#9AD6C5' : col;
       g.fillRect(x, (H - bh) / 2, 1.6, bh);
     }
-    g.strokeStyle = '#ECEBE6'; g.lineWidth = 3;
+    g.strokeStyle = '#D9DADD'; g.lineWidth = 3;
     if (fiN > 0) { g.beginPath(); g.moveTo(X(0), H - 6); g.lineTo(X(fiN), 8); g.stroke(); }
     if (foN > 0) { g.beginPath(); g.moveTo(X(n - foN), 8); g.lineTo(X(n), H - 6); g.stroke(); }
-    if (this.tool === 'trim') for (const i of [this.a, this.b]) { const x = X(i); g.fillStyle = '#E8C872'; g.fillRect(x - 3, 0, 6, H); g.fillRect(x - 16, H / 2 - 26, 32, 52); g.fillStyle = '#111'; g.fillRect(x - 2, H / 2 - 14, 4, 28); }
+    if (this.tool === 'trim') for (const i of [this.a, this.b]) { const x = X(i); g.fillStyle = '#9AD6C5'; g.fillRect(x - 3, 0, 6, H); g.fillRect(x - 16, H / 2 - 26, 32, 52); g.fillStyle = '#111'; g.fillRect(x - 2, H / 2 - 14, 4, 28); }
     if (this.ph >= 0) { g.fillStyle = '#fff'; g.fillRect(X(this.ph * this.sr) - 2, 0, 4, H); }
-    g.fillStyle = '#9A988F'; g.font = '26px Arial'; g.textAlign = 'left'; g.fillText(this.t(this.view / this.sr), 10, 30);
+    g.fillStyle = '#8C8E95'; g.font = '26px Arial'; g.textAlign = 'left'; g.fillText(this.t(this.view / this.sr), 10, 30);
     g.textAlign = 'right'; g.fillText(this.t(Math.min(n, this.view + vis) / this.sr), W - 10, 30);
     this.el.querySelector('.zl').textContent = 'Zoom ' + (Math.round(this.zoom * 10) / 10) + '×';
     const pan = this.el.querySelector('.pan'); pan.disabled = vis >= n; pan.value = n - vis > 0 ? this.view / (n - vis) * 1000 : 0;

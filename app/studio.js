@@ -168,13 +168,15 @@ class Studio {
       const at = this.segAt + (songT - this.segPos);
       if (at > horizon) break;
       if (at >= ctx.currentTime - 0.005) {
-        const st = ((this.nextBeat % 16) + 16) % 16, bar = Math.floor(this.nextBeat / 16);
-        // the pattern for this bar: the one being previewed, or the block in the compile row
-        const d = s.drums, blk = this.previewPat ? null : d.comp[bar];
-        const p = this.previewPat ? CZ.pat(d, this.previewPat) : blk ? CZ.pat(d, blk.p) : null;
-        if (p) for (let v = 0; v < CZ.NDRUMS; v++) if (p.steps[v][st]) this.playDrum(v, at);
-        if (st === 0) { const bb = this.previewPat ? -1 : (blk ? bar : -1); setTimeout(() => { if (this.playing) { this.drumBlock = bb; this.emit('block'); } }, Math.max(0, (at - ctx.currentTime) * 1000)); }
-        if (s.click && st % 4 === 0) this.playBuf(this.clickBufs[st === 0 ? 0 : 1], this.clickGain, at);
+        // the pattern for this step: the one being previewed (looping), or the block of the compile row playing now
+        const d = s.drums, nb = this.nextBeat;
+        let p = null, st = -1, blkI = -1;
+        if (this.previewPat) { p = CZ.pat(d, this.previewPat); const n = CZ.patSteps(p); st = ((nb % n) + n) % n; }
+        else { const b = nb >= 0 ? CZ.blockAt(s, nb) : null; if (b) { blkI = b.i; st = b.st; p = CZ.pat(d, d.comp[b.i].p); } }
+        if (p && st >= 0) for (let v = 0; v < CZ.NDRUMS; v++) if (p.steps[v][st]) this.playDrum(v, at);
+        if (st === 0 || (!p && this.drumBlock >= 0)) { const bb = blkI; setTimeout(() => { if (this.playing) { this.drumBlock = bb; this.emit('block'); } }, Math.max(0, (at - ctx.currentTime) * 1000)); }
+        const beatSt = ((nb % 16) + 16) % 16;
+        if (s.click && beatSt % 4 === 0) this.playBuf(this.clickBufs[beatSt === 0 ? 0 : 1], this.clickGain, at);
         const delayMs = Math.max(0, (at - ctx.currentTime) * 1000);
         setTimeout(() => { if (this.playing) { this.drumStep = st; this.emit('step'); } }, delayMs);
       }
@@ -315,10 +317,12 @@ class Studio {
           const bufs = CZ.drumBuffers(off).map((b, v) => this.customDrum(off, v) || b);
           const step = 60 / Math.max(30, s.bpm) / 4;
           let open = null;
-          s.drums.comp.forEach((blk, bar) => {
+          let at0 = 0;
+          s.drums.comp.forEach((blk) => {
             const p = CZ.pat(s.drums, blk.p); if (!p) return;
-            for (let st = 0; st < 16; st++) {
-              const t = (bar * 16 + st) * step; if (t >= end) return;
+            const n = CZ.patSteps(p), base = at0; at0 += n;
+            for (let st = 0; st < n; st++) {
+              const t = (base + st) * step; if (t >= end) return;
               for (let v = 0; v < CZ.NDRUMS; v++) if (p.steps[v][st]) {
                 if (v === 2 && open) { try { open.stop(t); } catch (e) {} }
                 const src = CZ.hit(off, bufs[v], s.drums.knobs[v], dg, t);

@@ -3,7 +3,7 @@
 
 const S = new Studio();
 const ui = { screen: 0, welcome: 0, track: 0, open: -1, menu: false, micAsked: false, micOk: false, sel: 0, pop: null, dialog: null };
-const COLOURS = ['#E8C872', '#D99A4A', '#C96F4A', '#B85C6E', '#9B6BB0', '#6E7FC4', '#4F9BB8', '#4FB5A0', '#7DB85A', '#B4B84F', '#D2A24C', '#A68B6A'];
+const COLOURS = CZ.TRACKCOL;   // Birthing Unit track colours, repeat after 8
 const $ = (q) => document.querySelector(q);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const isPhone = () => /iPhone|iPad|Android/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
@@ -59,8 +59,12 @@ function render() {
   else if (ui.screen === 6) app.innerHTML = modeScreen();
   else if (ui.screen === 4) app.innerHTML = masterScreen();
   else if (ui.screen === 5) { app.innerHTML = editScreen(); mountTrackEditor(); }
+  fillRanges();
   updateLive();
 }
+// faders: mint fill up to the cap
+function fillRanges(root) { (root || document).querySelectorAll('input[type=range]').forEach(setRangeFill); }
+function setRangeFill(r) { const a = +r.min || 0, b = r.max === '' ? 100 : +r.max; r.style.setProperty('--p', ((+r.value - a) / ((b - a) || 1) * 100) + '%'); }
 
 function welcome() {
   let body;
@@ -115,13 +119,13 @@ function mixScreen() {
         <b data-show="masterVol">${dbText(s.masterVol, -60)}</b></div>
       <div class="tracks"><div class="section">TRACKS ${ii('tracks')}</div>`;
   for (let i = 0; i < s.shown; i++) {
-    const t = s.tracks[i], c = COLOURS[i];
+    const t = s.tracks[i], c = COLOURS[i % 8];
     const len = t.audio ? fmt(t.audio.length / S.sr) : 'empty';
-    h += `<div class="trk"><i class="strip" style="background:${c}"></i><div class="grow">
+    h += `<div class="trk" style="border-color:${c}55"><i class="strip" style="background:${c}"></i><div class="grow">
           <div class="row"><span class="name" data-act="open-${i}">${esc(t.name)}</span><small>${len}</small></div>
-          <input type="range" min="-60" max="6" step="0.1" value="${t.vol}" data-bind="t${i}.vol" style="accent-color:${c}" aria-label="${esc(t.name)} volume">
-          <div class="lv thin"><i id="m${i}" style="background:${c}"></i></div></div>
-          <div class="keys">${hx('R', 'arm-' + i, 'mid ' + (t.arm ? 'red on' : ''))}${hx('M', 'mute-' + i, 'mid ' + (t.mute ? 'on' : ''))}${hx('S', 'solo-' + i, 'mid ' + (t.solo ? 'good on' : ''))}${hx('FX', 'open-' + i, 'mid')}${hx('&#8943;', 'tmenu-' + i, 'mid', 'aria-label="More for this track"')}</div></div>`;
+          <input type="range" min="-60" max="6" step="0.1" value="${t.vol}" data-bind="t${i}.vol" aria-label="${esc(t.name)} volume">
+          <div class="lv thin"><i id="m${i}"></i></div></div>
+          <div class="keys">${hx('R', 'arm-' + i, 'mid ' + (t.arm ? 'rec' : ''))}${hx('M', 'mute-' + i, 'mid ' + (t.mute ? 'on' : ''))}${hx('S', 'solo-' + i, 'mid ' + (t.solo ? 'on' : ''))}${hx('FX', 'open-' + i, 'mid')}${hx('&#8943;', 'tmenu-' + i, 'mid', 'aria-label="More for this track"')}</div></div>`;
   }
   h += `<div class="lbl center">${hx('Add track', 'add-track', '', s.shown >= 12 ? 'disabled' : '')}${ii('addtrack')}</div></div>`;
   h += `<div class="quick">${hx('Edit Mode', 'go-edit', 'sm')}${hx('Drums', 'go-drums', 'sm ' + (s.drums.comp.length ? 'on' : ''))}${S.polished() ? hx('Mastering', 'go-master', 'sm ' + (s.master.on ? 'on' : '')) : ''}${hx('Export', 'export', 'sm')}${hx('Library', 'lib', 'sm')}${hx('Player', 'um', 'sm')}${ii('shortcuts')}</div>`;
@@ -131,11 +135,11 @@ function mixScreen() {
 function transport() {
   const s = S.song, playOn = S.playing && !S.recording;
   return `<div class="transport"><div class="row center"><span id="time" class="time"></span><span class="bpm" data-act="m-tempo">${Math.round(s.bpm)} BPM</span>${ii('transport')}</div><div class="tbtns">
-    ${hx('&#9198;', 'rew', 'mid', 'aria-label="Rewind"')}
-    ${hx(playOn ? '&#9632;' : '&#9654;', 'play', 'big ' + (playOn ? 'on' : ''), 'aria-label="Play or stop"')}
-    ${hx('&#9679;', 'rec', 'big red ' + (S.recording ? 'on' : ''), 'aria-label="Record"')}
-    ${hx('&#10227;', 'loop', 'mid ' + (s.loop ? 'on' : ''), 'aria-label="Loop"')}
-    ${hx('&#9650;', 'click', 'mid ' + (s.click ? 'on' : ''), 'aria-label="Click"')}</div></div>`;
+    ${hx('&#9198;', 'rew', 'big', 'aria-label="Back to start"')}
+    ${hx(playOn ? '&#9632;' : '&#9654;', 'play', 'big gplay ' + (playOn ? 'on' : ''), 'aria-label="Play or stop"')}
+    ${hx('&#9679;', 'rec', 'big ' + (S.recording ? 'rec' : 'grec'), 'aria-label="Record"')}
+    ${hx('&#10227;', 'loop', 'big ' + (s.loop ? 'on' : ''), 'aria-label="Loop"')}
+    ${hx('&#9650;', 'click', 'big ' + (s.click ? 'on' : ''), 'aria-label="Click"')}</div></div>`;
 }
 
 function effectCard(t, u, fx) {
@@ -201,7 +205,7 @@ function mountTrackEditor() {
   const el = $('#trackEd'); if (!el) return;
   const i = ui.sel, t = S.song.tracks[i];
   const clip = { ch: [t.audio], fi: t.fi, fo: t.fo };
-  ui.editor = new WaveEditor(el, clip, editorOpts({ key: t, tools: ['trim', 'sil', 'fi', 'fo', 'drop'],
+  ui.editor = new WaveEditor(el, clip, editorOpts({ key: t, colour: COLOURS[i % 8], tools: ['trim', 'sil', 'fi', 'fo', 'drop'],
     onChange: (c) => { t.audio = c.ch[0]; t.fi = c.fi; t.fo = c.fo; S.undo = null; S.changed('edit'); },
     dropIn: (a, b) => new Promise(async (res) => { const r = await S.recordDropIn(i, a, b, (take) => res(take)); if (r === 'nomic') { say('Recording needs the microphone. Allow it in the browser settings for this page.'); res(null); } }),
     previewDrop: (from, to, audio, onEnd) => S.playRange(from, to, { i, audio: CZ.faded(audio, t.fi, t.fo, S.sr) }, onEnd) }));
@@ -281,8 +285,8 @@ async function exTrim() {
 function drawTrimWave() {
   const c = $('#trimWave'); if (!c) return;
   const g = c.getContext('2d'), W = c.width, H = c.height, ch = ex.clip.ch, n = ch[0].length, pk = CZ.peaks(ch, Math.max(1, Math.floor(n / (W / 2)))), sr = S.sr;
-  g.fillStyle = '#1C1D21'; g.fillRect(0, 0, W, H);
-  for (let x = 0; x < W; x += 2) { const v = pk[Math.min(pk.length - 1, Math.floor(x / W * pk.length))] || 0, bh = Math.max(2, v * H * 0.9); g.fillStyle = '#E8C872'; g.fillRect(x, (H - bh) / 2, 1.6, bh); }
+  g.fillStyle = '#121316'; g.fillRect(0, 0, W, H);
+  for (let x = 0; x < W; x += 2) { const v = pk[Math.min(pk.length - 1, Math.floor(x / W * pk.length))] || 0, bh = Math.max(2, v * H * 0.9); g.fillStyle = '#E2BF6A'; g.fillRect(x, (H - bh) / 2, 1.6, bh); }
   g.fillStyle = 'rgba(0,0,0,.65)'; g.fillRect(0, 0, ex.a * sr / n * W, H); g.fillRect(ex.b * sr / n * W, 0, W, H);
 }
 async function exMix() {
@@ -480,11 +484,11 @@ function umNow() { return um.playing ? Math.min(um.buf.duration, um.pos + S.ctx.
 function umDraw() {
   const c = $('#umWave'); if (!c) return;
   const g = c.getContext('2d'), W = c.width, H = c.height;
-  g.fillStyle = '#1C1D21'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#121316'; g.fillRect(0, 0, W, H);
   if (!um.buf) { $('#umPos').textContent = '0:00'; $('#umLen').textContent = '0:00'; return; }
   const len = um.buf.duration, t = umNow(), cut = t / len * W, N = um.peaks.length;
-  for (let x = 0; x < W; x += 2) { const v = um.peaks[Math.min(N - 1, Math.floor(x / W * N))] || 0, bh = Math.max(2, v * H * 0.9); g.fillStyle = x < cut ? '#E8C872' : '#4a4b52'; g.fillRect(x, (H - bh) / 2, 1.6, bh); }
-  g.fillStyle = '#ECEBE6'; g.fillRect(cut - 2, 0, 4, H);
+  for (let x = 0; x < W; x += 2) { const v = um.peaks[Math.min(N - 1, Math.floor(x / W * N))] || 0, bh = Math.max(2, v * H * 0.9); g.fillStyle = x < cut ? '#9AD6C5' : '#3A3C42'; g.fillRect(x, (H - bh) / 2, 1.6, bh); }
+  g.fillStyle = '#D9DADD'; g.fillRect(cut - 2, 0, 4, H);
   $('#umPos').textContent = fmt(t).replace(/\.\d$/, ''); $('#umLen').textContent = fmt(len).replace(/\.\d$/, '');
 }
 function umPlay() {
@@ -625,6 +629,7 @@ function updateLive() {
 
 // ------------------------------------------------------------------ sliders and text
 document.addEventListener('input', (e) => {
+  if (e.target && e.target.type === 'range') setRangeFill(e.target);
   const el = e.target, b = el.dataset.bind; if (!b) return;
   const v = parseFloat(el.value), s = S.song;
   let shown = '';
@@ -769,3 +774,5 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && S.s
   render();
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
+// faders inside dialogs and pop-ups get their fill too
+new MutationObserver(() => { if (!fillRanges.q) { fillRanges.q = requestAnimationFrame(() => { fillRanges.q = 0; fillRanges(); }); } }).observe(document.body, { childList: true, subtree: true });

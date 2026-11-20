@@ -1,54 +1,59 @@
-// Conceptor 0.4 drum programmer "Gillian and Stephen": Pattern Edit on top, Pattern Compile below.
-// Dark grey throughout; a pattern's colour shows only on its borders and its name. Hits use one colour per sound.
+// Conceptor 0.4.1 drum programmer "Gillian and Stephen": pattern cards on top, the Pattern Compile row directly under them,
+// and the editor for the selected pattern below that. Birthing Unit colours: pattern colour only on borders and names;
+// hits in the Birthing Unit drum lane colours at 75%.
 'use strict';
 
-const DP = { selBlk: -1, selSnd: 0, stripScroll: 0, compScroll: 0, drag: null };
+const DP = { selBlk: -1, selSnd: 0, stripScroll: 0, compScroll: 0, drag: null, half: 0 };
 const SLOT = 61;   // width of one block in the row, in pixels
-const SC = () => CZ.COLOURS.slice(0, CZ.NDRUMS);
+const SC = () => CZ.LANECOL;
 
 function miniGrid(cv, p, w, h) {
   const dpr = 2; cv.width = w * dpr; cv.height = h * dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr);
-  g.fillStyle = '#1C1D21'; g.fillRect(0, 0, w, h);
-  const cw = w / 16, ch = h / CZ.NDRUMS, sc = SC();
-  for (let r = 0; r < CZ.NDRUMS; r++) for (let c = 0; c < 16; c++) {
-    g.fillStyle = p.steps[r][c] ? sc[r] : ((c >> 2) % 2 ? '#3a3b42' : '#2c2d33');
+  g.fillStyle = '#1C1D20'; g.fillRect(0, 0, w, h);
+  const n = CZ.patSteps(p), cw = w / n, ch = h / CZ.NDRUMS, sc = SC();
+  for (let r = 0; r < CZ.NDRUMS; r++) for (let c = 0; c < n; c++) {
+    g.fillStyle = p.steps[r][c] ? sc[r] + 'BF' : ((c >> 2) % 2 ? '#202226' : '#2b2d32');
     g.fillRect(c * cw + 0.4, r * ch + 0.4, cw - 0.8, ch - 0.8);
   }
 }
+// Birthing Unit knob: dark body, ring, lavender pointer
 function knobSVG(v) {
-  const a = (-135 + v * 2.7) * Math.PI / 180, x = 16 + 10 * Math.sin(a), y = 16 - 10 * Math.cos(a);
-  return `<svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="#FF8C1A" stroke="#c4600a" stroke-width="2"/><line x1="16" y1="16" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#111" stroke-width="3" stroke-linecap="round"/></svg>`;
+  const a = (-135 + v * 2.7) * Math.PI / 180, x = 16 + 11 * Math.sin(a), y = 16 - 11 * Math.cos(a);
+  return `<svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="#2E2F34" stroke="#484A51" stroke-width="1.5"/><line x1="${(16 + 4 * Math.sin(a)).toFixed(1)}" y1="${(16 - 4 * Math.cos(a)).toFixed(1)}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#B9AAE0" stroke-width="2.4" stroke-linecap="round"/></svg>`;
 }
 const mmss = (s) => Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
 
 function drumScreen() {
   const s = S.song, d = s.drums, p = CZ.selPattern(s), ph = CZ.placeholder(s), sc = SC();
   if (DP.selBlk >= d.comp.length) DP.selBlk = -1;
+  if (p.bars !== 4) DP.half = 0;
+  const off = DP.half * 8;
   const smp = d.samples[DP.selSnd];
   const prev = S.previewPat === p.id;
   let h = topBack('GILLIAN AND STEPHEN', 'drums') + `<div class="scroll dp">
     <div class="section">PATTERN EDIT ${ii('patternedit')}<span class="hint">Tap to edit. Drag down to add.</span></div>
     <div class="strip2" id="strip">${d.patterns.map((x) => `<div class="pcard ${x.id === p.id ? 'sel' : ''}" data-p="${x.id}" style="border-color:${x.color};color:${x.color}">
         <div class="ch"><span>${esc(x.name)}</span><button class="dots" data-pmenu="${x.id}" aria-label="Pattern options">&#8943;</button></div><canvas></canvas>
-        <div class="phk ${x.ph ? 'on' : ''}" data-ph="${x.id}" role="checkbox" aria-checked="${x.ph}"><i>${x.ph ? '&#10003;' : ''}</i>Placeholder${x.id === CZ.selPattern(s).id ? ii('ph') : ''}</div>
-        ${x.ph ? `<div class="sl2">Song length<br><input id="phm" value="${Math.floor(d.phLen / 60)}" inputmode="numeric" aria-label="Minutes">:<input id="phs" value="${String(d.phLen % 60).padStart(2, '0')}" inputmode="numeric" aria-label="Seconds"> = ${CZ.phBars(s)} bars</div>` : ''}</div>`).join('')}
+        <div class="phk ${x.ph ? 'on' : ''}" data-ph="${x.id}" role="checkbox" aria-checked="${x.ph}"><i>${x.ph ? '&#10003;' : ''}</i>Placeholder${x.id === p.id ? ii('ph') : ''}</div>
+        ${x.ph ? `<div class="sl2">Song length<br><input id="phm" value="${Math.floor(d.phLen / 60)}" inputmode="numeric" aria-label="Minutes">:<input id="phs" value="${String(d.phLen % 60).padStart(2, '0')}" inputmode="numeric" aria-label="Seconds"> = ${CZ.phBars(s)} blocks</div>` : ''}</div>`).join('')}
       <button class="pcard add" data-act="dp-new"><b>+</b>New pattern</button></div>
+    <div class="section ctitle">PATTERN COMPILE ${ii('comp')}<span class="hint">${d.comp.length} blocks · ${mmss(CZ.rowSec(s))}${ph ? ` · fills to ${mmss(d.phLen)}` : ''}</span></div>
+    <div class="comp" id="comp"><div class="ruler" style="width:${d.comp.length * SLOT + 12}px">${d.comp.map((b, i) => `<span style="left:${i * SLOT}px">${i + 1}</span>`).join('')}</div>
+      <div class="track" id="ctrack">${d.comp.map((b, i) => { const q = CZ.pat(d, b.p) || p; return `<div class="blk ${b.ph ? 'ph' : ''} ${i === DP.selBlk ? 'sel' : ''} ${S.playing && S.drumBlock === i ? 'play' : ''}" data-i="${i}" style="border-color:${q.color}"><canvas></canvas><div class="bn" style="color:${q.color}">${b.ph ? 'Placeholder' : esc(q.name.replace(/^Pattern /, 'Pat '))}</div></div>`; }).join('')}</div>
+      <div class="marker" id="marker"></div>${d.comp.length ? '' : '<div class="empty">Empty. Drag patterns here, or use Add to row.</div>'}</div>
+    <div class="chead">${hx('Repeat', 'dp-repeat', '', DP.selBlk < 0 ? 'disabled' : '')}${hx('Remove', 'dp-remove', '', DP.selBlk < 0 ? 'disabled' : '')}${hx('Clear row', 'dp-clearrow')}</div>
     <div class="epanel"><div class="prow"><span class="pname" data-act="dp-rename" style="color:${p.color}">${esc(p.name)}</span>
-      ${hx(prev ? '&#9632;' : '&#9654;', 'dp-play', 'r ' + (prev ? 'on' : ''), 'aria-label="Play pattern"')}${hx('Add to row', 'dp-addrow')}${hx('Clear pattern', 'dp-clearpat')}</div>
-    <div class="dgrid8">`;
+      ${hx(prev ? '&#9632;' : '&#9654;', 'dp-play', 'r gplay ' + (prev ? 'on' : ''), 'aria-label="Play pattern"')}${hx('Add to row', 'dp-addrow')}${hx('Clear pattern', 'dp-clearpat')}</div>
+    <div class="brow">Number of bars ${hx('2', 'dp-bars-2', 'r ' + (p.bars === 2 ? 'yel' : ''), 'aria-pressed="' + (p.bars === 2) + '"')}${hx('4', 'dp-bars-4', 'r ' + (p.bars !== 2 ? 'yel' : ''), 'aria-pressed="' + (p.bars !== 2) + '"')}${ii('bars')}
+      <button class="sw2 ${p.bars === 2 ? 'off' : ''}" data-act="dp-half" ${p.bars === 2 ? 'disabled' : ''} aria-label="Show bars 1 and 2, or bars 3 and 4">Bars 1 &amp; 2 <span class="toggle ${DP.half ? 'on' : ''}"><i></i></span> Bars 3 &amp; 4</button></div>
+    <div class="dgrid8"><span></span><span class="ghead" style="grid-column:span 4">Bar ${off / 4 + 1}</span><span class="ghead" style="grid-column:span 4">Bar ${off / 4 + 2}</span>`;
   for (let r = 0; r < CZ.NDRUMS; r++) {
     h += `<button class="snd ${r === DP.selSnd ? 'sel' : ''}" data-act="dp-snd-${r}">${CZ.DRUMS[r]}</button>`;
-    for (let c = 0; c < 16; c++) h += `<span class="c ${(c >> 2) % 2 ? 'alt' : ''}" data-step="${c}" data-act="dp-cell-${r}-${c}" style="${p.steps[r][c] ? 'background:' + sc[r] : ''}" role="checkbox" aria-checked="${p.steps[r][c]}" aria-label="${CZ.DRUMS[r]} step ${c + 1}"></span>`;
+    for (let k = 0; k < 8; k++) { const c = off + k; h += `<span class="c ${(c >> 2) % 2 ? 'alt' : ''}" data-step="${c}" data-act="dp-cell-${r}-${c}" style="${p.steps[r][c] ? `background:${sc[r]}BF;border-color:${sc[r]}` : ''}" role="checkbox" aria-checked="${p.steps[r][c]}" aria-label="${CZ.DRUMS[r]} bar ${(c >> 2) + 1} square ${(c % 4) + 1}"></span>`; }
   }
   h += `</div>
     <div class="knobs"><span class="kl">${CZ.DRUMS[DP.selSnd]}<small>${smp ? esc(smp.name) : 'Built-in'}</small></span>${CZ.KNOBS.map((k, i) => `<div class="kn" data-k="${i}" role="slider" aria-label="${k}" aria-valuenow="${d.knobs[DP.selSnd][i]}">${knobSVG(d.knobs[DP.selSnd][i])}${k}</div>`).join('')}${ii('knobs')}</div>
     <div class="sndb">${hx('&#9654; Listen', 'dp-listen')}${hx('Import Audio', 'dp-import')}${hx('Edit Sound', 'dp-editsnd', '', smp ? '' : 'disabled')}${hx('Reset Sound', 'dp-resetsnd', '', smp ? '' : 'disabled')}${ii('drumsound')}</div></div>
-    <div class="section" style="margin-top:12px">PATTERN COMPILE ${ii('comp')}</div>
-    <div class="chead">${hx('Repeat', 'dp-repeat', '', DP.selBlk < 0 ? 'disabled' : '')}${hx('Remove', 'dp-remove', '', DP.selBlk < 0 ? 'disabled' : '')}${hx('Clear row', 'dp-clearrow')}
-      <span class="ln">Length: ${d.comp.length} bars · ${mmss(CZ.rowSec(s))}${ph ? `<br>Placeholder fills to ${CZ.phBars(s)} bars` : ''}</span></div>
-    <div class="comp" id="comp"><div class="ruler" style="width:${d.comp.length * SLOT + 12}px">${d.comp.map((b, i) => `<span style="left:${i * SLOT}px">${i + 1}</span>`).join('')}</div>
-      <div class="track" id="ctrack">${d.comp.map((b, i) => { const q = CZ.pat(d, b.p) || p; return `<div class="blk ${b.ph ? 'ph' : ''} ${i === DP.selBlk ? 'sel' : ''} ${S.playing && S.drumBlock === i ? 'play' : ''}" data-i="${i}" style="border-color:${q.color}"><canvas></canvas><div class="bn" style="color:${q.color}">${b.ph ? 'Placeholder' : esc(q.name.replace(/^Pattern /, 'Pat '))}</div></div>`; }).join('')}</div>
-      <div class="marker" id="marker"></div>${d.comp.length ? '' : '<div class="empty">Empty. Drag patterns here, or use Add to row.</div>'}</div>
   </div>`;
   return h + transport();
 }
@@ -66,7 +71,9 @@ function drumsAfter() {
 }
 function drumLive() {
   if (ui.screen !== 3) return;
-  const previewing = !!S.previewPat;
+  const previewing = !!S.previewPat, p = CZ.selPattern(S.song);
+  // while a 4-bar pattern plays, the grid shows the half that is playing
+  if (previewing && S.previewPat === p.id && p.bars === 4 && S.drumStep >= 0 && (S.drumStep >> 3) !== DP.half) { DP.half = S.drumStep >> 3; render(); return; }
   document.querySelectorAll('.dgrid8 .c').forEach((c) => c.classList.toggle('now', previewing && +c.dataset.step === S.drumStep));
   document.querySelectorAll('#ctrack .blk').forEach((b) => b.classList.toggle('play', S.playing && !previewing && +b.dataset.i === S.drumBlock));
 }
@@ -82,14 +89,14 @@ function togglePh(id) {
   if (p.ph) { p.ph = false; CZ.fillPh(s); DP.selBlk = -1; S.changed('drums'); render(); say('Placeholder removed from the row.'); return; }
   s.drums.patterns.forEach((x) => { x.ph = false; });
   p.ph = true; CZ.fillPh(s); DP.selBlk = -1; S.changed('drums'); render();
-  say(`${p.name} fills the row: ${mmss(s.drums.phLen)}, ${CZ.phBars(s)} bars.`);
+  say(`${p.name} fills the row: ${mmss(s.drums.phLen)}, ${CZ.phBars(s)} blocks.`);
 }
 function firstPh() { const i = S.song.drums.comp.findIndex((b) => b.ph); return i < 0 ? S.song.drums.comp.length : i; }
 function patMenu(id) {
   const s = S.song, d = s.drums, p = CZ.pat(d, id); d.sel = id;
   step({ title: p.name, opts: [
     ['Rename', () => renamePattern(id)],
-    ['Duplicate', () => { const n = CZ.newPattern(d, p.steps.map((r) => r.slice())); n.name = CZ.uniqueName(p.name + ' copy', d.patterns.map((x) => x.name)); d.sel = n.id; closeBox(); S.changed('drums'); render(); say('Duplicated.'); }],
+    ['Duplicate', () => { const n = CZ.newPattern(d, p.steps.map((r) => r.slice())); n.bars = p.bars; n.name = CZ.uniqueName(p.name + ' copy', d.patterns.map((x) => x.name)); d.sel = n.id; closeBox(); S.changed('drums'); render(); say('Duplicated.'); }],
     ['Delete', () => {
       if (d.patterns.length === 1) { message('Delete', 'One pattern must stay.'); return; }
       const used = d.comp.filter((b) => b.p === id).length;
@@ -111,6 +118,8 @@ async function drumAct(a) {
   else if (a === 'dp-addrow') { d.comp.splice(firstPh(), 0, { p: p.id }); CZ.trimPh(s); S.changed('drums'); render(); say(p.name + ' added to the row.'); }
   else if (a === 'dp-clearpat') { p.steps = CZ.emptySteps(); S.changed('drums'); render(); }
   else if ((r = a.match(/^dp-snd-(\d+)$/))) { DP.selSnd = +r[1]; render(); }
+  else if ((r = a.match(/^dp-bars-(2|4)$/))) { p.bars = +r[1]; if (p.bars === 2) DP.half = 0; CZ.fillPh(s); S.changed('drums'); render(); say(`${p.name}: ${p.bars} bars.`); }
+  else if (a === 'dp-half') { if (p.bars === 4) { DP.half = DP.half ? 0 : 1; render(); } }
   else if ((r = a.match(/^dp-cell-(\d+)-(\d+)$/))) { p.steps[+r[1]][+r[2]] = !p.steps[+r[1]][+r[2]]; S.changed('drums'); render(); }
   else if (a === 'dp-listen') { await S.startAudio(); S.stopListen(); S.playDrum(DP.selSnd, S.ctx.currentTime + 0.02, S.ctx.destination); }
   else if (a === 'dp-import') drumImport(DP.selSnd, null, false);
