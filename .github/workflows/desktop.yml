@@ -59,7 +59,7 @@ jobs:
       - name: Launch test (Mac)
         if: runner.os == 'macOS'
         run: |
-          timeout 150 "dist/mac-universal/Conceptor.app/Contents/MacOS/Conceptor" --smoke="$PWD/out/smoke-mac" || true
+          perl -e 'alarm shift; exec @ARGV' 150 "dist/mac-universal/Conceptor.app/Contents/MacOS/Conceptor" --smoke="$PWD/out/smoke-mac" || true
           cat out/smoke-mac.json
           node -e "const r=require('./out/smoke-mac.json').result; if(!r.version||!r.song||String(r.song).startsWith('error')) process.exit(1)"
 
