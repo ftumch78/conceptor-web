@@ -443,7 +443,7 @@ CZ.encodeMp3 = function (channels, sr) {
 };
 
 // ------------------------------------------------------------------ 0.3: names, fades, peaks, editing
-CZ.VERSION = '0.4.1';
+CZ.VERSION = '0.4.2';
 CZ.MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 CZ.today = () => { const d = new Date(); return d.getDate() + ' ' + CZ.MONTHS[d.getMonth()] + ' ' + d.getFullYear(); };
 CZ.uniqueName = (base, list) => { if (!list.includes(base)) return base; let k = 2; while (list.includes(base + ' (' + k + ')')) k++; return base + ' (' + k + ')'; };

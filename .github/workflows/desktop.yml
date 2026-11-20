@@ -1,0 +1,96 @@
+# Builds Conceptor for Windows and Mac from the web app, tests that each one opens, and publishes them.
+name: Desktop apps
+on:
+  push:
+    branches: [main, 'desktop-*']
+    paths: ['app/**', 'desktop/**', '.github/workflows/desktop.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Copy in the web app
+        run: rm -rf app && cp -R ../app app && cp ../app/icon-512.png build/icon.png
+      - name: Install
+        run: npm install --no-audit --no-fund
+      - name: Version
+        run: echo "VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          npx electron-builder --win nsis --x64 --publish never
+          ls -la dist
+          mkdir -p out && cp "dist/Conceptor-$VERSION-Windows-Setup.exe" out/
+      - name: Launch test (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          timeout 150 ./dist/win-unpacked/Conceptor.exe --smoke="$(cygpath -w "$PWD/out/smoke-windows")" || true
+          cat out/smoke-windows.json
+          node -e "const r=require('./out/smoke-windows.json').result; if(!r.version||!r.song||String(r.song).startsWith('error')) process.exit(1)"
+
+      - name: Build (Mac, Intel and Apple Silicon)
+        if: runner.os == 'macOS'
+        run: |
+          npx electron-builder --mac dir --universal --publish never
+          APP="dist/mac-universal/Conceptor.app"
+          # ad-hoc signature so it opens on Apple Silicon (right-click, Open the first time)
+          codesign --force --deep --sign - "$APP"
+          echo "Minimum macOS in Info.plist: $(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$APP/Contents/Info.plist")"
+          echo "Architectures: $(lipo -archs "$APP/Contents/MacOS/Conceptor")"
+          FW="$APP/Contents/Frameworks/Electron Framework.framework/Electron Framework"
+          lipo -thin x86_64 "$FW" -output /tmp/fw_x64 && (vtool -show-build /tmp/fw_x64 2>/dev/null || otool -l /tmp/fw_x64 | grep -A4 LC_BUILD_VERSION) | grep -i "minos" | head -1
+          mkdir -p dmgsrc out && cp -R "$APP" dmgsrc/ && ln -s /Applications dmgsrc/Applications
+          hdiutil create -volname "Conceptor" -srcfolder dmgsrc -ov -format UDZO "out/Conceptor-$VERSION-Mac.dmg"
+      - name: Launch test (Mac)
+        if: runner.os == 'macOS'
+        run: |
+          timeout 150 "dist/mac-universal/Conceptor.app/Contents/MacOS/Conceptor" --smoke="$PWD/out/smoke-mac" || true
+          cat out/smoke-mac.json
+          node -e "const r=require('./out/smoke-mac.json').result; if(!r.version||!r.song||String(r.song).startsWith('error')) process.exit(1)"
+
+      - name: Picture of the app (for the guide)
+        run: |
+          f=$(ls out/smoke-*.png | head -1); echo "PNG-BEGIN"; base64 "$f" | tr -d '\n'; echo; echo "PNG-END"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: conceptor-${{ runner.os }}
+          path: |
+            desktop/out/*.exe
+            desktop/out/*.dmg
+
+  release:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: files
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./desktop/package.json').version")
+          TAG="v$VERSION"
+          ls -R files
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" files/*/* --clobber
+          else
+            gh release create "$TAG" files/*/* --title "Conceptor $VERSION (Windows and Mac)" --notes "Windows: download Conceptor-$VERSION-Windows-Setup.exe and open it. Mac (macOS 10.15 Catalina or later, Intel or Apple Silicon): download Conceptor-$VERSION-Mac.dmg, open it and drag Conceptor to Applications. The install guide is at https://ftumch78.github.io/conceptor-web/"
+          fi

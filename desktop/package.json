@@ -1,0 +1,39 @@
+{
+  "name": "conceptor",
+  "productName": "Conceptor",
+  "version": "0.4.2",
+  "description": "Conceptor: record ideas. A small multitrack recorder in the Honey Trap ecosystem.",
+  "author": "Honey Trap",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "devDependencies": {
+    "electron": "32.3.3",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "com.honeytrap.conceptor",
+    "productName": "Conceptor",
+    "copyright": "Honey Trap",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["main.js", "app/**/*"],
+    "asar": false,
+    "mac": {
+      "category": "public.app-category.music",
+      "minimumSystemVersion": "10.15",
+      "identity": null,
+      "icon": "build/icon.png",
+      "extendInfo": { "NSMicrophoneUsageDescription": "Conceptor records from the microphone or audio interface." }
+    },
+    "win": { "icon": "build/icon.png", "target": "nsis" },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Conceptor",
+      "artifactName": "Conceptor-${version}-Windows-Setup.${ext}"
+    }
+  }
+}
