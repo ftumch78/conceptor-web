@@ -1,4 +1,4 @@
-// Conceptor 0.3 web screens. Hexagon buttons, Hand Hold tips, Home on every screen and pop-up, one question at a time.
+// Conceptor 0.4 web screens. Capsule and round buttons (hexagons only in the menu), Hand Hold tips, Home on every screen and pop-up, one question at a time.
 'use strict';
 
 const S = new Studio();
@@ -36,7 +36,7 @@ const DL = {};
 function step(o) {
   const L = o.layer || 'dialog'; DL[L] = o;
   const el = $('#' + L);
-  el.innerHTML = `<div class="box">${o.n ? `<div class="stepn">Step ${o.n}${o.total ? ' of ' + o.total : ''}</div>` : ''}<h2>${esc(o.title)}</h2>
+  el.innerHTML = `<div class="box">${o.n ? `<div class="stepn">Step ${o.n}${o.total ? ' of ' + o.total : ''}</div>` : ''}<h2>${esc(o.title)}${o.tip ? ii(o.tip) : ''}</h2>
     <div class="boxbody">${o.text ? `<p>${o.text}</p>` : ''}${o.html || ''}<div class="opts">${(o.opts || []).map((x, i) =>
       `<button class="hex full ${x[2] || ''}" data-pick="${i}" ${x[3] ? 'disabled' : ''}><span>${esc(x[0])}</span></button>`).join('')}</div></div>
     <div class="boxbtns">${o.back ? hx('Back', 'dl-back') : '<span></span>'}${o.cancel === false ? '' : hx(o.cancelLabel || 'Cancel', 'dl-close')}</div></div>`;
@@ -55,7 +55,8 @@ function render() {
   if (ui.screen === 0) app.innerHTML = welcome();
   else if (ui.screen === 1) app.innerHTML = mixScreen();
   else if (ui.screen === 2) app.innerHTML = trackScreen();
-  else if (ui.screen === 3) app.innerHTML = drumScreen();
+  else if (ui.screen === 3) { app.innerHTML = drumScreen(); drumsAfter(); }
+  else if (ui.screen === 6) app.innerHTML = modeScreen();
   else if (ui.screen === 4) app.innerHTML = masterScreen();
   else if (ui.screen === 5) { app.innerHTML = editScreen(); mountTrackEditor(); }
   updateLive();
@@ -73,17 +74,36 @@ function welcome() {
 
 function topMain() {
   return `<div class="top"><span class="brand">CONCEPTOR</span>
-    <span class="songname" data-act="rename-song"><span>${esc(S.song.name)}</span></span>${ii('songname')}
+    <span class="songname" data-act="rename-song"><span>${esc(S.song.name)}</span></span><button class="modetag ${S.polished() ? 'p' : ''}" data-act="m-mode">${S.polished() ? 'POLISHED' : 'DEMO'}</button>${ii('songname')}
     <span class="lbl">${hx('Menu', 'menu', 'sm')}${ii('menu')}</span></div>`;
 }
 function topBack(title, k) { return `<div class="top">${homeBtn()}<span class="title">${title}</span>${k ? ii(k) : '<span class="sp"></span>'}</div>`; }
 
 function menuHtml() {
-  const items = [['New song', 'm-new'], ['Library', 'lib', 'lib'], ['Edit Mode', 'go-edit', 'edit'], ['Ultrasound Machine', 'um', 'um'], ['Export', 'export', 'export'],
-    ['Drum grid (Gillian and Stephen)', 'go-drums', 'drums'], ['Mastering', 'go-master', 'mastering'], ['Tempo, click and loop', 'm-tempo', 'tempo'],
+  const pol = S.polished();
+  const items = [['New song', 'm-new'], ['Library', 'lib', 'lib'], ['Mode: ' + (pol ? 'Polished' : 'Demo'), 'm-mode', 'mode'], ['Edit Mode', 'go-edit', 'edit'], ['Ultrasound Machine', 'um', 'um'],
+    ['Export', 'export', 'export'], ['Drum programmer', 'go-drums', 'drums'], ['Mastering', 'go-master', 'mastering', !pol], ['Tempo, click and loop', 'm-tempo', 'tempo'],
     ['Input and output', 'm-io', 'io'], ['Save now', 'm-save'], ['Undo last take', 'm-undo', 'undo'], ['Help', 'm-help']];
-  return `<div class="menu">${items.map(([l, a, k]) => `<div class="item" data-act="${a}"><span class="lbl">${l}${k ? ii(k) : ''}</span></div>`).join('')}
-    <div class="item" data-act="hh"><span class="lbl">Hand Hold${ii('hh')}</span><span class="toggle ${handHold() ? 'on' : ''}"><i></i></span></div></div>`;
+  return `<div class="menuback" data-act="menu"></div><div class="menu">${items.map(([l, a, k, off]) => `<div class="hx ${off ? 'off' : ''}" data-act="${off ? 'polished-only' : a}"><span class="lbl">${l}${k ? ii(k) : ''}</span>${off ? '<small>Polished only</small>' : ''}</div>`).join('')}
+    <div class="hx" data-act="hh"><span class="lbl">Hand Hold${ii('hh')}</span><span class="toggle ${handHold() ? 'on' : ''}"><i></i></span></div></div>`;
+}
+
+// ------------------------------------------------------------------ Demo Mode and Polished Mode
+const MODE_TEXT = {
+  demo: 'Simple recording and arranging for capturing ideas quickly. No mastering section; export includes trim only.',
+  polished: 'Full feature set, including the mastering section. For tracks being prepared for release.' };
+function modeScreen() {
+  const c = (m, t) => `<button class="modecard ${ui.pickMode === m ? 'sel' : ''}" data-act="pick-${m}" aria-pressed="${ui.pickMode === m}"><h3><span class="radio"></span>${t}</h3><p>${MODE_TEXT[m]}</p></button>`;
+  return `<div class="top"><span class="brand">CONCEPTOR</span><span class="songname">${esc(S.song.name)}</span>${ii('mode')}</div><div class="scroll">
+    <div class="section">CHOOSE A MODE</div>${c('demo', 'Demo Mode')}${c('polished', 'Polished Mode')}
+    <p class="dim small">The mode can be changed later in the Menu.</p>${hx('Open song', 'mode-open', 'on wide')}</div>`;
+}
+function askMode() { ui.pickMode = S.song.mode || 'demo'; ui.screen = 6; ui.menu = false; render(); }
+function changeMode() {
+  const s = S.song;
+  step({ title: 'Mode', tip: 'mode', text: `<b>Demo Mode:</b> ${MODE_TEXT.demo}<br><br><b>Polished Mode:</b> ${MODE_TEXT.polished}`, opts: [
+    ['Demo Mode', () => { s.mode = 'demo'; closeBox(); S.changed('mode'); render(); say('Demo Mode.'); }, s.mode === 'demo' ? 'on' : ''],
+    ['Polished Mode', () => { s.mode = 'polished'; closeBox(); S.changed('mode'); render(); say('Polished Mode.'); }, s.mode === 'polished' ? 'on' : '']] });
 }
 
 function mixScreen() {
@@ -104,13 +124,13 @@ function mixScreen() {
           <div class="keys">${hx('R', 'arm-' + i, 'mid ' + (t.arm ? 'red on' : ''))}${hx('M', 'mute-' + i, 'mid ' + (t.mute ? 'on' : ''))}${hx('S', 'solo-' + i, 'mid ' + (t.solo ? 'good on' : ''))}${hx('FX', 'open-' + i, 'mid')}${hx('&#8943;', 'tmenu-' + i, 'mid', 'aria-label="More for this track"')}</div></div>`;
   }
   h += `<div class="lbl center">${hx('Add track', 'add-track', '', s.shown >= 12 ? 'disabled' : '')}${ii('addtrack')}</div></div>`;
-  h += `<div class="quick">${hx('Edit Mode', 'go-edit', 'sm')}${hx('Drums', 'go-drums', 'sm ' + (s.drums.on ? 'on' : ''))}${hx('Mastering', 'go-master', 'sm ' + (s.master.on ? 'on' : ''))}${hx('Export', 'export', 'sm')}${hx('Library', 'lib', 'sm')}${hx('Player', 'um', 'sm')}${ii('shortcuts')}</div>`;
+  h += `<div class="quick">${hx('Edit Mode', 'go-edit', 'sm')}${hx('Drums', 'go-drums', 'sm ' + (s.drums.comp.length ? 'on' : ''))}${S.polished() ? hx('Mastering', 'go-master', 'sm ' + (s.master.on ? 'on' : '')) : ''}${hx('Export', 'export', 'sm')}${hx('Library', 'lib', 'sm')}${hx('Player', 'um', 'sm')}${ii('shortcuts')}</div>`;
   return h + transport();
 }
 
 function transport() {
   const s = S.song, playOn = S.playing && !S.recording;
-  return `<div class="transport"><div class="row center"><span id="time" class="time"></span>${ii('transport')}</div><div class="tbtns">
+  return `<div class="transport"><div class="row center"><span id="time" class="time"></span><span class="bpm" data-act="m-tempo">${Math.round(s.bpm)} BPM</span>${ii('transport')}</div><div class="tbtns">
     ${hx('&#9198;', 'rew', 'mid', 'aria-label="Rewind"')}
     ${hx(playOn ? '&#9632;' : '&#9654;', 'play', 'big ' + (playOn ? 'on' : ''), 'aria-label="Play or stop"')}
     ${hx('&#9679;', 'rec', 'big red ' + (S.recording ? 'on' : ''), 'aria-label="Record"')}
@@ -146,24 +166,6 @@ function trackScreen() {
     <div class="section">EFFECTS, IN THE ORDER THE SOUND PASSES THROUGH THEM ${ii('effects')}</div>`;
   t.fx.forEach((fx, u) => { h += effectCard(i, u, fx); });
   return h + '</div>' + transport();
-}
-
-function drumScreen() {
-  const d = S.song.drums;
-  let h = topBack('GILLIAN AND STEPHEN', 'drums') + `<div class="scroll">
-    <div class="row line"><span>Drums on</span>${sw(d.on, 'drums-on')}</div>
-    ${slider('Drum volume', d.vol, -40, 6, 0.1, 'drums.vol', d.vol.toFixed(1) + ' dB')}
-    <div class="row line"><span class="dim">Tempo ${Math.round(S.song.bpm)} bpm, the same as the click.</span>${hx('Tempo', 'm-tempo', 'sm')}</div>
-    <div class="section">START FROM A PATTERN ${ii('patterns')}</div><div class="pills">${CZ.DRUM_PRESETS.map((p, k) => hx(p, 'preset-' + k, 'sm')).join('')}</div>
-    <div class="section">SOUNDS AND STEPS ${ii('drumrow')}</div><div class="dgrid">`;
-  for (let v = 0; v < 6; v++) {
-    const smp = d.samples[v];
-    h += `<button class="dname" data-act="dsound-${v}">${CZ.DRUMS[v]}${smp ? `<small>${esc(smp.name)}</small>` : ''}</button>`;
-    for (let st = 0; st < 16; st++) h += `<span class="cell ${d.steps[v][st] ? 'lit' : ''} ${(st >> 2) % 2 ? 'alt' : ''}" data-step="${st}" style="${d.steps[v][st] ? 'background:' + COLOURS[v] : ''}" data-act="cell-${v}-${st}" role="checkbox" aria-checked="${d.steps[v][st]}" aria-label="${CZ.DRUMS[v]} step ${st + 1}"></span>`;
-  }
-  h += `</div><div class="beats"><span></span><span>Beat 1</span><span>Beat 2</span><span>Beat 3</span><span>Beat 4</span></div>
-    <div class="lbl center">${hx('Import Audio', 'dimport', 'sm')}${ii('drumimport')}</div></div>`;
-  return h + transport();
 }
 
 function masterScreen() {
@@ -256,33 +258,62 @@ let ex = null;
 function exportFlow() {
   const s = S.song; ex = { clip: null };
   if (S.exportLength(-1) <= 0) { message('Export', 'This song has no audio yet.'); return; }
-  step({ title: 'Export', n: 1, total: 4, text: 'Export what?', opts: [['Exported Mix (whole song)', exMix], ['Individual Tracks', exTracks, '', !s.tracks.some((t) => t.audio)]] });
+  if (!S.polished()) { exTrim(); return; }
+  step({ title: 'Export', n: 1, total: 4, tip: 'export', text: 'Export what?', opts: [['Exported Mix (whole song)', exMix], ['Individual Tracks', exTracks, '', !s.tracks.some((t) => t.audio)]] });
+}
+async function exRender() {
+  if (ex.clip) return;
+  busy('Export', 'Making the mix. This takes a few seconds.');
+  const r = await S.renderMixChannels(false);   // mastering is chosen later (Polished) or not used (Demo)
+  ex.clip = { ch: r.channels, fi: 0, fo: 0 };
+}
+// Demo export, step 1: trim the start and end over the wave
+async function exTrim() {
+  await exRender();
+  const sr = S.sr, L = ex.clip.ch[0].length / sr;
+  if (ex.a == null) { ex.a = 0; ex.b = L; }
+  step({ title: 'Export', n: 1, total: 2, tip: 'demoexport', text: 'Trim the start and the end. Leave them to keep everything.',
+    html: `<canvas id="trimWave" width="1360" height="160"></canvas>
+      ${slider('Start', ex.a, 0, L, 0.1, 'ex.a', fmt(ex.a))}${slider('End', ex.b, 0, L, 0.1, 'ex.b', fmt(ex.b))}
+      <div class="row gap">${hx('&#9654; Play', 'ex-trimplay')}</div>`,
+    opts: [['Next', () => { S.stopListen(); exFormat('demo'); }]], onCancel: () => S.stopListen(), mount: drawTrimWave });
+}
+function drawTrimWave() {
+  const c = $('#trimWave'); if (!c) return;
+  const g = c.getContext('2d'), W = c.width, H = c.height, ch = ex.clip.ch, n = ch[0].length, pk = CZ.peaks(ch, Math.max(1, Math.floor(n / (W / 2)))), sr = S.sr;
+  g.fillStyle = '#1C1D21'; g.fillRect(0, 0, W, H);
+  for (let x = 0; x < W; x += 2) { const v = pk[Math.min(pk.length - 1, Math.floor(x / W * pk.length))] || 0, bh = Math.max(2, v * H * 0.9); g.fillStyle = '#E8C872'; g.fillRect(x, (H - bh) / 2, 1.6, bh); }
+  g.fillStyle = 'rgba(0,0,0,.65)'; g.fillRect(0, 0, ex.a * sr / n * W, H); g.fillRect(ex.b * sr / n * W, 0, W, H);
 }
 async function exMix() {
-  if (!ex.clip) {
-    busy('Export', 'Making the mix. This takes a few seconds.');
-    const r = await S.renderMixChannels();
-    ex.clip = { ch: r.channels, fi: 0, fo: 0 };
-  }
-  step({ title: 'Export mix', n: 2, total: 4, text: 'Edit the mix if needed: trim, insert silence or fade. Then press Next.' + ' ' + ii('exedit'),
-    html: '<div class="ed" id="mixEd"></div>', opts: [['Next', () => { S.stopListen(); exFormat('mix'); }]], back: () => { S.stopListen(); exportFlow(); },
+  await exRender();
+  step({ title: 'Export mix', n: 2, total: 4, tip: 'exedit', text: 'Edit the mix if needed: trim, insert silence or fade. Then press Next.',
+    html: '<div class="ed" id="mixEd"></div>', opts: [['Next', () => { S.stopListen(); exMaster(); }]], back: () => { S.stopListen(); exportFlow(); },
     mount: () => new WaveEditor($('#mixEd'), ex.clip, editorOpts({ key: ex, tools: ['trim', 'sil', 'fi', 'fo'], onChange: () => {} })) });
 }
-function exTracks() { step({ title: 'Export tracks', n: 2, total: 4, text: 'Raw tracks, or with their effects?', opts: [['Raw', () => exFormat('raw')], ['With effects', () => exFormat('fx')]], back: exportFlow }); }
+function exMaster() {
+  step({ title: 'Export', n: 3, total: 4, tip: 'masterchoice', text: 'Use the mastering settings on this export?', back: exMix,
+    opts: [['Yes, with mastering', () => { ex.mastering = true; exFormat('mix'); }], ['No, without mastering', () => { ex.mastering = false; exFormat('mix'); }]] });
+}
+function exTracks() { step({ title: 'Export tracks', n: 2, total: 3, text: 'Raw tracks, or with their effects?', opts: [['Raw', () => exFormat('raw')], ['With effects', () => exFormat('fx')]], back: exportFlow }); }
 function exFormat(kind) {
-  step({ title: 'Export', n: 3, total: 4, text: 'Format?', opts: [['WAV', () => exConfirm(kind, 'WAV')], ['MP3 320k', () => exConfirm(kind, 'MP3 320k')]], back: kind === 'mix' ? exMix : exTracks });
+  const demo = kind === 'demo';
+  step({ title: 'Export', n: demo ? 2 : kind === 'mix' ? 4 : 3, total: demo ? 2 : kind === 'mix' ? 4 : 3, text: 'Format?',
+    opts: [['WAV', () => exConfirm(kind, 'WAV')], ['MP3 320k', () => exConfirm(kind, 'MP3 320k')]], back: demo ? exTrim : kind === 'mix' ? exMaster : exTracks });
 }
 function exConfirm(kind, f) {
   const s = S.song, n = s.tracks.filter((t) => t.audio).length;
-  const what = kind === 'mix' ? `"${s.name} – Exported Mix"` : `${plural(n, 'track')} (${kind === 'raw' ? 'raw' : 'with effects'})`;
-  step({ title: 'Export', n: 4, total: 4, text: `Saves ${esc(what)} as ${f} in the Library, in the folder "${esc(s.name)}".`, opts: [['Save', () => exDone(kind, f)]], back: () => exFormat(kind) });
+  const what = kind === 'mix' || kind === 'demo' ? `"${s.name} – Exported Mix"` : `${plural(n, 'track')} (${kind === 'raw' ? 'raw' : 'with effects'})`;
+  step({ title: 'Export', text: `Saves ${esc(what)} as ${f} in the Library, in the folder "${esc(s.name)}".`, opts: [['Save', () => exDone(kind, f)]], back: () => exFormat(kind) });
 }
 async function exDone(kind, f) {
   const s = S.song, sr = S.sr, mp3 = f === 'MP3 320k';
   busy('Export', 'Saving. This takes a few seconds.');
   let saved = [];
-  if (kind === 'mix') {
-    const ch = ex.clip.ch.map((c) => CZ.faded(c, ex.clip.fi, ex.clip.fo, sr));
+  if (kind === 'mix' || kind === 'demo') {
+    let ch = ex.clip.ch.map((c) => CZ.faded(c, ex.clip.fi, ex.clip.fo, sr));
+    if (kind === 'demo') { const a = Math.round(ex.a * sr), b = Math.round(ex.b * sr); ch = ch.map((c) => c.slice(a, b)); const f = Math.min(ch[0].length, Math.round(sr / 200)); for (const c of ch) for (let i = 0; i < f; i++) { c[i] *= i / f; c[c.length - 1 - i] *= i / f; } }
+    if (kind === 'mix' && ex.mastering) ch = await S.masterProcess(ch);
     const blob = mp3 ? CZ.encodeMp3(ch, sr) : CZ.encodeWav(ch, sr);
     saved.push(await S.addExport('mix', s.name + ' – Exported Mix', f, blob, ch[0].length / sr));
     ex = null;
@@ -294,6 +325,7 @@ async function exDone(kind, f) {
     }
   }
   const one = saved[0];
+  if (kind === 'demo') kind = 'mix';
   step({ title: 'Saved', text: `${esc(kind === 'mix' ? one.name : plural(saved.length, 'track'))} ${kind === 'mix' ? 'is' : 'are'} in the Library.`, cancel: false, opts: [
     ['Open Library', () => { closeBox(); openLib(s.name); }],
     ...(kind === 'mix' ? [['Play in Ultrasound Machine', () => { closeBox(); openUM('final', one.id); }]] : []),
@@ -433,7 +465,7 @@ async function umLoad() {
     if (m.kind === 'final') buf = await S.ctx.decodeAudioData(await m.blob.arrayBuffer());
     else {
       const song = m.song === S.song.name ? S.song : await S.getSong(m.song);
-      if (CZ.songLength(song) > 0 || song.drums.on) {
+      if (CZ.songLength(song) > 0 || song.drums.comp.length) {
         const keep = S.song; S.song = song;
         try { const r = await S.renderMixChannels(); buf = S.ctx.createBuffer(2, r.channels[0].length, S.sr); r.channels.forEach((c, k) => buf.getChannelData(k).set(c)); } finally { S.song = keep; }
       }
@@ -520,17 +552,6 @@ function openDed(v) {
   new WaveEditor($('#dedEd'), { ch: [smp.audio], fi: smp.fi, fo: smp.fo }, editorOpts({ key: smp, tools: ['trim', 'fi', 'fo'],
     onChange: (c) => { smp.audio = c.ch[0]; smp.fi = c.fi; smp.fo = c.fo; smp.ver = (smp.ver || 0) + 1; S.changed('drums'); } }));
 }
-function drumMenu(v) {
-  const smp = S.song.drums.samples[v];
-  step({ title: CZ.DRUMS[v], text: smp ? `Using ${esc(smp.name)}.` : 'Using the built-in sound.', opts: [
-    ['Listen', async () => { await S.startAudio(); const b = S.drumBuf(v); S.listen([b.getChannelData(0)]); }],
-    ['Import Audio', () => drumImport(v, () => drumMenu(v))],
-    ['Edit Sound', () => { closeBox(); openDed(v); }, '', !smp],
-    ['Reset Sound', () => { S.resetDrumSample(v); closeBox(); render(); say('Built-in sound restored.'); }, '', !smp]] });
-}
-function drumImportPick() {
-  step({ title: 'Import Audio', n: 1, total: 2, text: 'Replace which sound?', opts: CZ.DRUMS.map((d, v) => [d + (S.song.drums.samples[v] ? ` (now ${S.song.drums.samples[v].name})` : ''), () => drumImport(v, drumImportPick, true)]) });
-}
 const cand = { list: [] };
 function drumImport(v, back, two) {
   const rows = cand.list.map((f, k) => `<div class="row"><div class="grow">${esc(f.name)}<div class="sub">${f.audio.length / S.sr < 10 ? (f.audio.length / S.sr).toFixed(2) + ' s' : fmt(f.audio.length / S.sr)}</div></div>${hx('&#9654; Listen', 'cl-' + k, 'sm')}${hx('Use', 'cu-' + v + '-' + k, 'sm on')}</div>`).join('');
@@ -597,7 +618,7 @@ function updateLive() {
     const p = Math.min(100, peak(S.master.meter) * 100); const l = $('#mL'), r = $('#mR'); if (l) l.style.width = p + '%'; if (r) r.style.width = p + '%';
   }
   const lim = $('#limiting'); if (lim && S.master) lim.textContent = (S.song.master.on ? S.master.reduction : 0).toFixed(1) + ' dB';
-  if (ui.screen === 3) document.querySelectorAll('.cell').forEach((c) => c.classList.toggle('now', +c.dataset.step === S.drumStep));
+  drumLive();
   if (ui.pop === 'um' && um.playing) umDraw();
 }
 (function loop() { updateLive(); requestAnimationFrame(loop); })();
@@ -608,7 +629,13 @@ document.addEventListener('input', (e) => {
   const v = parseFloat(el.value), s = S.song;
   let shown = '';
   if (b === 'masterVol') { s.masterVol = v; shown = dbText(v, -60); }
-  else if (b === 'bpm') { s.bpm = Math.round(v); shown = s.bpm + ' bpm'; }
+  else if (b === 'bpm') { s.bpm = Math.round(v); shown = s.bpm + ' bpm'; CZ.fillPh(s); }
+  else if (b === 'ex.a' || b === 'ex.b') {
+    const L = ex.clip.ch[0].length / S.sr;
+    if (b === 'ex.a') ex.a = Math.max(0, Math.min(v, ex.b - 0.1)); else ex.b = Math.min(L, Math.max(v, ex.a + 0.1));
+    el.value = ex[b.slice(3)]; shown = fmt(ex[b.slice(3)]); drawTrimWave();
+    document.querySelectorAll(`[data-show="${b}"]`).forEach((x) => { x.textContent = shown; }); return;
+  }
   else if (b === 'offset') { S.offsetMs = Math.round(v); localStorage.setItem('cz.offsetMs', S.offsetMs); shown = S.offsetMs + ' ms'; }
   else if (b === 'drums.vol') { s.drums.vol = v; shown = v.toFixed(1) + ' dB'; }
   else if (b === 'master.gain') { s.master.gain = v; shown = v.toFixed(1) + ' dB'; }
@@ -647,12 +674,12 @@ document.addEventListener('click', async (e) => {
   if (a === 'w-start') { await S.startAudio(); ui.welcome = 1; }
   else if (a === 'w-mic') { await S.startAudio(); ui.micOk = await S.openMic(); ui.micAsked = true; }
   else if (a === 'w-next') ui.welcome = 2;
-  else if (a === 'w-create') { await S.newSong($('#firstName').value); localStorage.setItem('cz.intro', '1'); ui.screen = 1; }
+  else if (a === 'w-create') { await S.newSong($('#firstName').value); localStorage.setItem('cz.intro', '1'); askMode(); return; }
   else if (a === 'menu') ui.menu = !ui.menu;
   else if (a === 'hh') { setHandHold(!handHold()); say(handHold() ? 'Hand Hold on.' : 'Hand Hold off.'); ui.menu = true; }
   else if (a === 'rename-song') { renameSongFlow(s.name); rerender = false; }
   else if (a === 'go-drums') go(3);
-  else if (a === 'go-master') go(4);
+  else if (a === 'go-master') { if (!S.polished()) { message('Mastering', 'Mastering is in Polished Mode only. Change the mode in the Menu.'); return; } go(4); }
   else if (a === 'go-edit') { ui.sel = Math.max(0, s.tracks.findIndex((t) => t.audio)); go(5); }
   else if ((r = m(/^esel-(\d+)$/))) { if (ui.editor) ui.editor.stop(); ui.sel = +r[1]; render(); }
   else if ((r = m(/^edit-(\d+)$/))) { ui.sel = +r[1]; go(5); }
@@ -674,11 +701,12 @@ document.addEventListener('click', async (e) => {
   else if ((r = m(/^fx-var-(-?\d+)-(\d+)-(\d+)$/))) { const fx = fxOf(+r[1], +r[2]); fx.variant = +r[3]; fx.vals = CZ.defaults(+r[2], fx.variant); fx.on = true; S.changed(); }
   else if ((r = m(/^fx-reset-(-?\d+)-(\d+)$/))) { const fx = fxOf(+r[1], +r[2]); fx.vals = CZ.defaults(+r[2], fx.variant); S.changed(); }
   else if (a === 'clear') { step({ title: `Clear track ${ui.track + 1}?`, text: 'The recording on this track is removed. The effect settings stay.', opts: [['Clear', () => { S.clearTrack(ui.track); closeBox(); render(); }, 'red']] }); rerender = false; }
-  else if (a === 'drums-on') { s.drums.on = !s.drums.on; S.changed(); }
-  else if ((r = m(/^preset-(\d+)$/))) { CZ.applyPreset(s, +r[1]); S.changed(); }
-  else if ((r = m(/^cell-(\d+)-(\d+)$/))) { s.drums.steps[+r[1]][+r[2]] = !s.drums.steps[+r[1]][+r[2]]; S.changed(); }
-  else if ((r = m(/^dsound-(\d+)$/))) { drumMenu(+r[1]); rerender = false; }
-  else if (a === 'dimport') { drumImportPick(); rerender = false; }
+  else if (a.startsWith('dp-')) { await drumAct(a); return; }
+  else if (a === 'm-mode') { changeMode(); return; }
+  else if (a === 'pick-demo' || a === 'pick-polished') ui.pickMode = a.slice(5);
+  else if (a === 'mode-open') { s.mode = ui.pickMode; S.changed('mode'); ui.screen = 1; say((s.mode === 'polished' ? 'Polished' : 'Demo') + ' Mode.'); }
+  else if (a === 'polished-only') { ui.menu = false; render(); message('Mastering', 'Mastering is in Polished Mode only. Change the mode in the Menu.'); return; }
+  else if (a === 'ex-trimplay') { const sr = S.sr; S.listen(ex.clip.ch, ex.a, ex.b); return; }
   else if ((r = m(/^cfiles-(\d+)$/))) { pickFile(async (files) => { for (const f of files) { const au = await S.decodeFile(f, 4); if (au) cand.list.push({ name: f.name, audio: au }); else say(f.name + ' could not be read.'); } DL.dialog.redraw(); }, true); return; }
   else if ((r = m(/^cl-(\d+)$/))) { S.listen([cand.list[+r[1]].audio]); return; }
   else if ((r = m(/^tl-(\d+)$/))) { S.listen([s.tracks[+r[1]].audio.slice(0, S.sr * 4)]); return; }
@@ -686,7 +714,7 @@ document.addEventListener('click', async (e) => {
   else if ((r = m(/^tu-(\d+)-(\d+)$/))) { const t = s.tracks[+r[2]]; S.stopListen(); S.setDrumSample(+r[1], t.audio.slice(0, S.sr * 4), t.name); closeBox(); say('Imported. Tap the sound name, then Edit Sound, to trim or fade it.'); }
   else if (a === 'ded-done') { hidePop(); S.saveNow(); say('Sound saved. It plays in the pattern.'); }
   else if (a === 'master-on') { s.master.on = !s.master.on; S.changed(); }
-  else if (a === 'm-new') { const n = await S.newSong(null); ui.screen = 1; say('New song: ' + n); }
+  else if (a === 'm-new') { await S.newSong(null); askMode(); return; }
   else if (a === 'm-save') { await S.saveNow(); say('Saved.'); }
   else if (a === 'm-undo') say(S.undoTake() ? 'Last take removed.' : 'Nothing to undo.');
   else if (a === 'm-tempo') { tempoDialog(); rerender = ui.screen !== 5; }
@@ -701,7 +729,7 @@ document.addEventListener('click', async (e) => {
   else if (a === 'lf') { lib.folder = el.dataset.name; drawLib(); return; }
   else if (a === 'lib-loc') { locationFlow(); return; }
   else if (a === 'lib-sync') { syncFlow(); return; }
-  else if (a === 'lopen') { await S.saveNow(); await S.load(lib.folder); hidePop(); ui.screen = 1; say('Opened ' + lib.folder + '.'); }
+  else if (a === 'lopen') { await S.saveNow(); await S.load(lib.folder); hidePop(); askMode(); return; }
   else if (a === 'lrename') { renameSongFlow(lib.folder); return; }
   else if (a === 'ldelete') { deleteFlow(lib.folder); return; }
   else if ((r = m(/^lcopy-(\d+)$/))) { copyFlow(lib.folder, +r[1]); return; }

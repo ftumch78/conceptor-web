@@ -76,13 +76,17 @@ class Studio {
       this.strips[i].apply(t, !t.mute && (!anySolo || t.solo));
       if (this.monitorGains) this.monitorGains[i].gain.value = t.arm ? 1 : 0;
     });
-    this.master.apply(this.song);
-    this.drumGain.gain.value = this.song.drums.on ? CZ.dbToGain(this.song.drums.vol) : 0;
+    this.master.apply(this.song, this.masterOn());
+    this.drumGain.gain.value = CZ.dbToGain(this.song.drums.vol);
   }
   changed(what) { this.dirty = true; this.applyAll(); this.emit(what || 'change'); this.scheduleSave(); }
 
   // ------------------------------------------------------------------ transport
-  length() { return CZ.songLength(this.song) / this.sr; }
+  // the song is as long as its longest track or its drum row, whichever is longer
+  length() { return Math.max(CZ.songLength(this.song) / this.sr, CZ.rowSec(this.song)); }
+  polished() { return this.song && this.song.mode === 'polished'; }
+  // Demo Mode has no mastering. The settings are kept for when the song goes back to Polished.
+  masterOn() { return !!(this.song && this.song.master.on && this.polished()); }
   loopRange() {
     const s = this.song; const L = this.length();
     if (s.loopEnd > s.loopStart + 0.05) return [s.loopStart, s.loopEnd];
@@ -94,7 +98,7 @@ class Studio {
     await this.startAudio();
     if (this.playing) return;
     const L = this.length();
-    if (!this.song.loop && this.pos >= L && !this.song.click && !this.song.drums.on) this.pos = 0;
+    if (!this.song.loop && this.pos >= L && !this.song.click) this.pos = 0;
     this.startSegment(this.ctx.currentTime + 0.05, this.pos);
     this.playing = true;
     this.timer = setInterval(() => this.tick(), 25);
@@ -105,7 +109,8 @@ class Studio {
     this.pos = Math.max(0, this.now());
     for (const s of this.sources) { try { s.stop(); } catch (e) {} }
     this.sources = []; clearInterval(this.timer); this.timer = null;
-    this.playing = false; this.drumStep = -1; this.rangeEnd = null;
+    this.playing = false; this.drumStep = -1; this.drumBlock = -1; this.rangeEnd = null;
+    if (this.previewPat) { this.previewPat = null; this.pos = 0; }
     if (this.dropMon != null && this.monitorGains) { this.monitorGains[this.dropMon].gain.value = this.song.tracks[this.dropMon].arm ? 1 : 0; this.dropMon = null; }
     if (this.recording) this.finishRecording();
     this.emit('transport');
@@ -120,6 +125,7 @@ class Studio {
   startSegment(at, p) {
     this.segAt = at; this.segPos = p; this.nextBeat = null;
     const sr = this.sr;
+    if (this.previewPat) { this.schedFrom = p; return; }
     this.song.tracks.forEach((t, i) => {
       if (!t.audio || t.audio.length / sr <= p) return;
       const audio = this.override && this.override.i === i ? this.override.audio : CZ.trackAudio(t, sr);
@@ -144,7 +150,7 @@ class Studio {
           this.startSegment(segEndAt, a);
         }
       }
-    } else if (!this.recording && !this.rangeEnd && !s.click && !s.drums.on && t >= this.length() + 0.05) {
+    } else if (!this.recording && !this.rangeEnd && !this.previewPat && !s.click && t >= this.length() + 0.05) {
       this.stop(); this.pos = this.length(); this.emit('transport'); return;
     }
     if (this.recording && t >= CZ.MAX_SECONDS) { this.stop(); return; }
@@ -162,10 +168,12 @@ class Studio {
       const at = this.segAt + (songT - this.segPos);
       if (at > horizon) break;
       if (at >= ctx.currentTime - 0.005) {
-        const st = ((this.nextBeat % 16) + 16) % 16;
-        if (s.drums.on) {
-          for (let v = 0; v < 6; v++) if (s.drums.steps[v][st]) this.playDrum(v, at);
-        }
+        const st = ((this.nextBeat % 16) + 16) % 16, bar = Math.floor(this.nextBeat / 16);
+        // the pattern for this bar: the one being previewed, or the block in the compile row
+        const d = s.drums, blk = this.previewPat ? null : d.comp[bar];
+        const p = this.previewPat ? CZ.pat(d, this.previewPat) : blk ? CZ.pat(d, blk.p) : null;
+        if (p) for (let v = 0; v < CZ.NDRUMS; v++) if (p.steps[v][st]) this.playDrum(v, at);
+        if (st === 0) { const bb = this.previewPat ? -1 : (blk ? bar : -1); setTimeout(() => { if (this.playing) { this.drumBlock = bb; this.emit('block'); } }, Math.max(0, (at - ctx.currentTime) * 1000)); }
         if (s.click && st % 4 === 0) this.playBuf(this.clickBufs[st === 0 ? 0 : 1], this.clickGain, at);
         const delayMs = Math.max(0, (at - ctx.currentTime) * 1000);
         setTimeout(() => { if (this.playing) { this.drumStep = st; this.emit('step'); } }, delayMs);
@@ -174,10 +182,18 @@ class Studio {
     }
   }
   playBuf(buf, dest, at) { const src = this.ctx.createBufferSource(); src.buffer = buf; src.connect(dest); src.start(at); return src; }
-  playDrum(v, at) {
+  playDrum(v, at, dest) {
     if (v === 2 && this.openHat) { try { this.openHat.stop(at); } catch (e) {} }
-    const src = this.playBuf(this.drumBuf(v), this.drumGain, at);
+    const src = CZ.hit(this.ctx, this.drumBuf(v), this.song.drums.knobs[v], dest || this.drumGain, at);
     if (v === 3) this.openHat = src;
+    return src;
+  }
+  // plays one pattern again and again, without the tracks
+  async previewPattern(id) {
+    await this.startAudio();
+    if (this.playing) this.stop();
+    this.previewPat = id; this.pos = 0;
+    await this.play();
   }
 
   // ------------------------------------------------------------------ recording
@@ -259,9 +275,7 @@ class Studio {
   // ------------------------------------------------------------------ export
   exportLength(track) {
     if (track >= 0) { const a = this.song.tracks[track].audio; return a ? a.length / this.sr : 0; }
-    const L = this.length();
-    if (L > 0 || !this.song.drums.on) return L;
-    return 16 * 60 / Math.max(30, this.song.bpm);
+    return this.length();
   }
   // returns {blob, name}
   async exportFile(plan) {
@@ -295,20 +309,23 @@ class Studio {
         const src = off.createBufferSource(); src.buffer = b; src.connect(strip.trim); src.start(0);
       }
       if (plan.track < 0) {
-        master.apply(s);
-        if (s.drums.on) {
+        master.apply(s, plan.mastering === false ? false : this.masterOn());
+        if (s.drums.comp.length) {
           const dg = off.createGain(); dg.gain.value = CZ.dbToGain(s.drums.vol); dg.connect(master.input);
           const bufs = CZ.drumBuffers(off).map((b, v) => this.customDrum(off, v) || b);
           const step = 60 / Math.max(30, s.bpm) / 4;
           let open = null;
-          for (let k = 0; k * step < end; k++) {
-            const st = k % 16;
-            for (let v = 0; v < 6; v++) if (s.drums.steps[v][st]) {
-              if (v === 2 && open) { try { open.stop(k * step); } catch (e) {} }
-              const src = off.createBufferSource(); src.buffer = bufs[v]; src.connect(dg); src.start(k * step);
-              if (v === 3) open = src;
+          s.drums.comp.forEach((blk, bar) => {
+            const p = CZ.pat(s.drums, blk.p); if (!p) return;
+            for (let st = 0; st < 16; st++) {
+              const t = (bar * 16 + st) * step; if (t >= end) return;
+              for (let v = 0; v < CZ.NDRUMS; v++) if (p.steps[v][st]) {
+                if (v === 2 && open) { try { open.stop(t); } catch (e) {} }
+                const src = CZ.hit(off, bufs[v], s.drums.knobs[v], dg, t);
+                if (v === 3) open = src;
+              }
             }
-          }
+          });
         }
       }
       const rendered = await off.startRendering();
@@ -436,7 +453,9 @@ class Studio {
   static fill(rec) {
     const song = Object.assign(CZ.newSong(rec.name), rec);
     song.tracks.forEach((t) => { t.arm = false; t.fi = t.fi || 0; t.fo = t.fo || 0; if (t.audio && !(t.audio instanceof Float32Array)) t.audio = new Float32Array(t.audio); });
-    if (!song.drums.samples) song.drums.samples = [null, null, null, null, null, null];
+    let longest = 0; for (const t of song.tracks) if (t.audio) longest = Math.max(longest, t.audio.length);
+    CZ.migrateDrums(song, longest / (song.rate || 48000));
+    if (!song.mode) song.mode = song.master && song.master.on ? 'polished' : 'demo';
     if (!song.exports) song.exports = [];
     if (!song.created) song.created = CZ.today();
     return song;
@@ -511,7 +530,19 @@ class Studio {
     await this.saveNow();
     return e;
   }
-  async renderMixChannels() {
+  // runs a finished stereo mix through the mastering section (EQ, compressor, limiter), for the Polished export
+  async masterProcess(chs) {
+    await this.startAudio();
+    const sr = this.sr, n = chs[0].length, off = new OfflineAudioContext(2, n + Math.round(sr / 400), sr);
+    await off.audioWorklet.addModule('worklets.js');
+    const m = CZ.makeMaster(off, off.destination); m.apply(this.song, true); m.vol.gain.value = 1;
+    const b = off.createBuffer(2, n, sr); chs.forEach((c, k) => b.getChannelData(k).set(c));
+    const src = off.createBufferSource(); src.buffer = b; src.connect(m.input); src.start(0);
+    const out = await off.startRendering(), la = Math.max(8, Math.round(sr / 500));
+    return [0, 1].map((k) => out.getChannelData(k).slice(la, la + n));
+  }
+  async renderMixChannels(mastering) {
+    if (mastering === false) return (await this.exportFile({ track: -1, withFx: true, format: 0, start: 0, end: 0, channelsOnly: true, mastering: false }));
     return (await this.exportFile({ track: -1, withFx: true, format: 0, start: 0, end: 0, channelsOnly: true }));
   }
 
@@ -562,7 +593,7 @@ class Studio {
       else { try { await td.removeEntry(file); } catch (e) {} }
     }
     const ds = s.drums.samples || [];
-    if (ds.some((x) => x)) { const dd = await dir.getDirectoryHandle('Drum Sounds', { create: true }); for (let v = 0; v < 6; v++) if (ds[v]) await this.writeFile(dd, v + '.wav', CZ.encodeWav([ds[v].audio], sr)); }
+    if (ds.some((x) => x)) { const dd = await dir.getDirectoryHandle('Drum Sounds', { create: true }); for (let v = 0; v < CZ.NDRUMS; v++) if (ds[v]) await this.writeFile(dd, v + '.wav', CZ.encodeWav([ds[v].audio], sr)); }
     for (const e of s.exports) {
       const sub = await dir.getDirectoryHandle(e.kind === 'mix' ? 'Exported Mixes' : 'Exported Tracks', { create: true });
       const fname = CZ.cleanFile(e.name) + (e.fmt === 'MP3 320k' ? '.mp3' : '.wav');
@@ -579,7 +610,7 @@ class Studio {
     let td = null; try { td = await dir.getDirectoryHandle('Tracks'); } catch (e) {}
     for (let i = 0; i < song.tracks.length; i++) song.tracks[i].audio = td ? await readWav(td, String(i + 1).padStart(2, '0') + '.wav') : null;
     let dd = null; try { dd = await dir.getDirectoryHandle('Drum Sounds'); } catch (e) {}
-    for (let v = 0; v < 6; v++) if (song.drums.samples[v]) { const a = dd ? await readWav(dd, v + '.wav') : null; song.drums.samples[v] = a ? Object.assign(song.drums.samples[v], { audio: a }) : null; }
+    for (let v = 0; v < CZ.NDRUMS; v++) if (song.drums.samples[v]) { const a = dd ? await readWav(dd, v + '.wav') : null; song.drums.samples[v] = a ? Object.assign(song.drums.samples[v], { audio: a }) : null; }
     for (const e of song.exports) {
       try { const sub = await dir.getDirectoryHandle(e.kind === 'mix' ? 'Exported Mixes' : 'Exported Tracks'); e.blob = await (await sub.getFileHandle(CZ.cleanFile(e.name) + (e.fmt === 'MP3 320k' ? '.mp3' : '.wav'))).getFile(); } catch (er) { e.blob = null; }
     }

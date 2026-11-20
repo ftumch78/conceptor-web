@@ -53,7 +53,8 @@ CZ.knobText = (k, v) => { if (k.unit === 'Hz' && v >= 1000) return (v / 1000).to
 CZ.formatTime = (s) => { s = Math.max(0, s); const m = Math.floor(s / 60); const r = s - m * 60; return m + ':' + (r < 10 ? '0' : '') + r.toFixed(1); };
 CZ.dbToGain = (db) => (db <= -59.5 ? 0 : Math.pow(10, db / 20));
 
-CZ.DRUMS = ['Kick', 'Snare', 'Closed hat', 'Open hat', 'Clap', 'Tom'];
+CZ.DRUMS = ['Kick', 'Snare', 'Closed hat', 'Open hat', 'Clap', 'Low tom', 'High tom', 'Rim'];
+CZ.NDRUMS = 8;
 CZ.DRUM_PRESETS = ['Empty', 'Basic rock', 'Four on the floor', 'Half time', 'Shuffle feel'];
 CZ.DRUM_PATTERNS = [
   ['................', '................', '................', '................', '................', '................'],
@@ -71,14 +72,73 @@ CZ.newSong = function (name) {
   }
   return {
     name, tracks, shown: 4, masterVol: 0, bpm: 100, click: false, loop: false, loopStart: 0, loopEnd: 0,
-    drums: { on: false, vol: -6, steps: CZ.DRUM_PATTERNS[0].map(() => new Array(16).fill(false)), samples: [null, null, null, null, null, null] },
-    exports: [], created: CZ.today(),
+    drums: CZ.newDrums(),
+    exports: [], created: CZ.today(), mode: 'demo',
     master: { on: false, gain: 3, ceiling: -1, eq: { on: false, variant: 0, vals: CZ.defaults(4, 0) },
       comp: { on: true, variant: 1, vals: [25, 2, 1] } },
   };
 };
 CZ.applyPreset = function (song, k) {
-  song.drums.steps = CZ.DRUM_PATTERNS[k].map((row) => Array.from(row).map((c) => c === 'x'));
+  const p = CZ.selPattern(song);
+  p.steps = CZ.emptySteps(); CZ.DRUM_PATTERNS[k].forEach((row, v) => Array.from(row).forEach((c, i) => { p.steps[v][i] = c === 'x'; }));
+};
+
+// ------------------------------------------------------------------ 0.4 drum programmer: patterns, compile row, placeholder, sound knobs
+CZ.COLOURS = ['#E8C872', '#D99A4A', '#C96F4A', '#B85C6E', '#9B6BB0', '#6E7FC4', '#4F9BB8', '#4FB5A0', '#7DB85A', '#B4B84F', '#D2A24C', '#A68B6A'];
+CZ.PCOL = [0, 6, 4, 8, 3, 5, 7, 2].map((i) => CZ.COLOURS[i]);   // gold, blue-teal, purple, green, rose, blue, teal, rust
+CZ.KNOBS = ['Pitch', 'Tone', 'Length', 'Level'];
+CZ.emptySteps = () => Array.from({ length: CZ.NDRUMS }, () => new Array(16).fill(false));
+CZ.newDrums = () => ({ vol: -6, patterns: [{ id: 1, name: 'Pattern 1', color: CZ.PCOL[0], ph: false, steps: CZ.emptySteps() }], nextId: 2, sel: 1,
+  comp: [], phLen: 240, knobs: Array.from({ length: CZ.NDRUMS }, () => [50, 50, 50, 80]), samples: new Array(CZ.NDRUMS).fill(null) });
+CZ.newPattern = (d, steps) => { const id = d.nextId++; const p = { id, name: 'Pattern ' + id, color: CZ.PCOL[(id - 1) % CZ.PCOL.length], ph: false, steps: steps || CZ.emptySteps() }; d.patterns.push(p); return p; };
+CZ.pat = (d, id) => d.patterns.find((x) => x.id === id);
+CZ.selPattern = (song) => CZ.pat(song.drums, song.drums.sel) || song.drums.patterns[0];
+CZ.barSec = (song) => 4 * 60 / Math.max(30, song.bpm);
+CZ.rowSec = (song) => song.drums.comp.length * CZ.barSec(song);
+CZ.phBars = (song) => Math.ceil(song.drums.phLen / CZ.barSec(song) - 1e-9);
+CZ.placeholder = (song) => song.drums.patterns.find((x) => x.ph) || null;
+// fills the row with placeholder blocks up to the song length. Real blocks stay where they are.
+CZ.fillPh = (song) => {
+  const d = song.drums, p = CZ.placeholder(song);
+  if (!p) { d.comp = d.comp.filter((b) => !b.ph); return; }
+  d.comp.forEach((b) => { if (b.ph) b.p = p.id; });
+  while (d.comp.length < CZ.phBars(song)) d.comp.push({ p: p.id, ph: true });
+  CZ.trimPh(song);
+};
+// keeps the row at the song length when real blocks are put in
+CZ.trimPh = (song) => { const d = song.drums; if (!CZ.placeholder(song)) return; let extra = d.comp.length - CZ.phBars(song); for (let i = d.comp.length - 1; i >= 0 && extra > 0; i--) if (d.comp[i].ph) { d.comp.splice(i, 1); extra--; } };
+
+// songs from 0.3 and earlier: one 6-sound grid that repeated while the drums were on
+CZ.migrateDrums = function (song, songSeconds) {
+  const d = song.drums || {};
+  if (d.patterns) { if (!d.knobs) d.knobs = Array.from({ length: CZ.NDRUMS }, () => [50, 50, 50, 80]); while ((d.samples || (d.samples = [])).length < CZ.NDRUMS) d.samples.push(null); return; }
+  const nd = CZ.newDrums();
+  if (d.steps) d.steps.forEach((row, v) => row.forEach((on, i) => { if (v < CZ.NDRUMS) nd.patterns[0].steps[v][i] = !!on; }));
+  if (d.samples) d.samples.forEach((x, v) => { if (v < CZ.NDRUMS) nd.samples[v] = x; });
+  if (typeof d.vol === 'number') nd.vol = d.vol;
+  if (d.on) { const bars = Math.max(4, Math.ceil(songSeconds / (4 * 60 / Math.max(30, song.bpm || 100)))); for (let i = 0; i < bars; i++) nd.comp.push({ p: 1 }); }
+  song.drums = nd;
+};
+
+// one drum hit with its sound knobs: Pitch (±1 octave), Tone (darker below 50, brighter above), Length, Level
+CZ.hit = function (ctx, buf, kn, dest, at) {
+  const [pitch, tone, length, level] = kn || [50, 50, 50, 80];
+  const src = ctx.createBufferSource(); src.buffer = buf;
+  src.playbackRate.value = Math.pow(2, (pitch - 50) / 50);
+  let node = src;
+  if (Math.abs(tone - 50) > 0.5) {
+    const f = ctx.createBiquadFilter();
+    if (tone < 50) { f.type = 'lowpass'; f.frequency.value = 300 * Math.pow(20000 / 300, tone / 50); }
+    else { f.type = 'highshelf'; f.frequency.value = 3000; f.gain.value = (tone - 50) / 50 * 12; }
+    node.connect(f); node = f;
+  }
+  const g = ctx.createGain(), lv = Math.pow(level / 80, 2);
+  g.gain.setValueAtTime(lv, at);
+  const dur = buf.duration / src.playbackRate.value;
+  if (length < 50) { const end = at + Math.max(0.02, dur * (0.05 + 0.95 * length / 50)); g.gain.setValueAtTime(lv, Math.max(at, end - 0.015)); g.gain.linearRampToValueAtTime(0, end); }
+  node.connect(g); g.connect(dest);
+  src.start(at);
+  return src;
 };
 
 // ------------------------------------------------------------------ shaping curves and impulse responses
@@ -297,8 +357,8 @@ CZ.makeMaster = function (ctx, dest) {
   m.vol.connect(m.eq.input); m.eq.output.connect(m.comp.input); m.comp.output.connect(m.chain);
   m.vol.connect(m.bypassed);
   m.chain.connect(m.lim); m.bypassed.connect(m.lim); m.lim.connect(dest); m.lim.connect(m.meter);
-  m.apply = (song) => {
-    const ms = song.master;
+  m.apply = (song, enabled) => {
+    const ms = Object.assign({}, song.master, { on: enabled === undefined ? song.master.on : enabled });
     if (ctx instanceof OfflineAudioContext) m.vol.gain.value = CZ.dbToGain(song.masterVol); else m.vol.gain.setTargetAtTime(CZ.dbToGain(song.masterVol), ctx.currentTime, 0.01);
     m.chain.gain.value = ms.on ? 1 : 0; m.bypassed.gain.value = ms.on ? 0 : 1;
     m.eq.apply(ms.eq); m.comp.apply(ms.comp);
@@ -325,6 +385,8 @@ CZ.drumBuffers = function (ctx) {
   }
   out.push(make(0.3, (d) => { let lp = 0, hp = 0, pl = 0; for (let i = 0; i < d.length; i++) { const t = i / sr; const burst = t % 0.011; const env = t < 0.033 ? Math.exp(-burst * 300) : Math.exp(-(t - 0.033) * 18) * 0.7; lp += 0.35 * (noise() - lp); hp = 0.9 * (hp + lp - pl); pl = lp; d[i] = hp * env * 0.9; } }));
   out.push(make(0.4, (d) => { let ph = 0; for (let i = 0; i < d.length; i++) { const t = i / sr; const f = 95 + 45 * Math.exp(-t * 12); ph += 2 * Math.PI * f / sr; d[i] = Math.sin(ph) * Math.exp(-t * 9) * 0.8; } }));
+  out.push(make(0.32, (d) => { let ph = 0; for (let i = 0; i < d.length; i++) { const t = i / sr; const f = 165 + 70 * Math.exp(-t * 14); ph += 2 * Math.PI * f / sr; d[i] = Math.sin(ph) * Math.exp(-t * 11) * 0.75; } }));
+  out.push(make(0.07, (d) => { let ph = 0, hp = 0, pv = 0; for (let i = 0; i < d.length; i++) { const t = i / sr; ph += 2 * Math.PI * 1700 / sr; const x = noise(); hp = 0.6 * (hp + x - pv); pv = x; d[i] = (Math.sin(ph) * 0.5 + hp * 0.5) * Math.exp(-t * 70) * 0.8; } }));
   return out;
 };
 CZ.clickBuffers = function (ctx) {
@@ -360,7 +422,7 @@ CZ.encodeMp3 = function (channels, sr) {
 };
 
 // ------------------------------------------------------------------ 0.3: names, fades, peaks, editing
-CZ.VERSION = '0.3';
+CZ.VERSION = '0.4';
 CZ.MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 CZ.today = () => { const d = new Date(); return d.getDate() + ' ' + CZ.MONTHS[d.getMonth()] + ' ' + d.getFullYear(); };
 CZ.uniqueName = (base, list) => { if (!list.includes(base)) return base; let k = 2; while (list.includes(base + ' (' + k + ')')) k++; return base + ' (' + k + ')'; };
@@ -387,6 +449,7 @@ CZ.concat = (parts) => { let n = 0; for (const p of parts) n += p.length; const 
 
 CZ.TIPS = {
   menu: ['Menu', 'All the main parts of Conceptor are here.'],
+  placeholder: ['Placeholder', 'Fills the whole song row with this pattern, 4 minutes long.'],
   songname: ['Song name', 'Tap the name to rename the song. New songs are called "Untitled" plus the date until they are named.'],
   master: ['Master', 'Volume of the whole mix. The two bars show the left and right level.'],
   tracks: ['Tracks', 'Each row is one track. R arms it for recording, M mutes it, S solos it. FX opens its effects. The hexagon with three dots has Import Audio, Edit, Copy To Song and Rename.'],
@@ -413,7 +476,15 @@ CZ.TIPS = {
   skip: ['Skip 10 seconds', 'Moves back or forward 10 seconds. Tap the wave to jump to a point.'],
   loop: ['Loop and Volume', 'Loop plays the mix again from the start when it ends. Volume only changes playback, not the file.'],
   umactions: ['Export, Share, Library', 'Export saves the mix as a file. Share sends it to another app, such as Instagram, email or VLC. Open Library shows all songs.'],
-  drums: ['Gillian and Stephen', 'A 16-step drum grid that follows the click tempo. Tap a square to turn a hit on or off.'],
+  drums: ['Gillian and Stephen', 'The drum programmer. Make patterns at the top, then put them in order in the row at the bottom. The drums follow the click tempo.'],
+  mode: ['Demo and Polished', 'Demo Mode is for capturing ideas quickly. Polished Mode adds mastering and the full export, for tracks being prepared for release. Change it in the Menu.'],
+  patternedit: ['Pattern Edit', 'Make drum patterns here. Tap a square to add or remove a hit. Each pattern has its own colour and name. Tap ⋯ to rename, duplicate or delete it.'],
+  knobs: ['Sound controls', 'Tap a sound name on the left of the grid, then drag a knob up or down. Changes affect that sound in every pattern.'],
+  ph: ['Placeholder', 'Fills the whole song row with this pattern, 4 minutes long. Change the length under the tick box. Drop other patterns onto the striped blocks later to replace them.'],
+  comp: ['Pattern Compile', "The song's drum track. Drag a pattern card down into this row, or use Add to row. Tap a block to select it for Repeat or Remove. Hold a block to move it, or drag it out of the row to remove it."],
+  drumsound: ['Drum sounds', 'Listen plays the selected sound. Import Audio replaces it with an audio file; press Listen on a file before Use. Edit Sound trims and fades it. Reset Sound puts the built-in one back.'],
+  demoexport: ['Demo export', 'Drag Start and End to cut the beginning or the end, then choose the format.'],
+  masterchoice: ['Mastering on export', 'Yes runs the mix through the mastering section (EQ, compressor, limiter). No saves it as it is.'],
   drumrow: ['Drum sounds', 'Tap a sound name to listen to it, import an audio file for it, edit it, or go back to the built-in sound.'],
   drumimport: ['Import Audio', 'Replaces one drum sound with an audio file. Press Listen to hear a file before using it. Reset Sound puts the built-in one back.'],
   patterns: ['Patterns', 'Starting patterns. Choosing one replaces the grid.'],
