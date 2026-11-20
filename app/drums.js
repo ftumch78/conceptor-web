@@ -43,7 +43,7 @@ function drumScreen() {
       <div class="marker" id="marker"></div>${d.comp.length ? '' : '<div class="empty">Empty. Drag patterns here, or use Add to row.</div>'}</div>
     <div class="chead">${hx('Repeat', 'dp-repeat', '', DP.selBlk < 0 ? 'disabled' : '')}${hx('Remove', 'dp-remove', '', DP.selBlk < 0 ? 'disabled' : '')}${hx('Clear row', 'dp-clearrow')}</div>
     <div class="epanel"><div class="prow"><span class="pname" data-act="dp-rename" style="color:${p.color}">${esc(p.name)}</span>
-      ${hx(prev ? '&#9632;' : '&#9654;', 'dp-play', 'r gplay ' + (prev ? 'on' : ''), 'aria-label="Play pattern"')}${hx('Add to row', 'dp-addrow')}${hx('Clear pattern', 'dp-clearpat')}</div>
+      ${hx(prev ? '&#9632;&#xFE0E;' : '&#9654;&#xFE0E;', 'dp-play', 'r gplay ' + (prev ? 'on' : ''), 'aria-label="Play pattern"')}${hx('Add to row', 'dp-addrow')}${hx('Clear pattern', 'dp-clearpat')}</div>
     <div class="brow">Number of bars ${hx('2', 'dp-bars-2', 'r ' + (p.bars === 2 ? 'yel' : ''), 'aria-pressed="' + (p.bars === 2) + '"')}${hx('4', 'dp-bars-4', 'r ' + (p.bars !== 2 ? 'yel' : ''), 'aria-pressed="' + (p.bars !== 2) + '"')}${ii('bars')}
       <button class="sw2 ${p.bars === 2 ? 'off' : ''}" data-act="dp-half" ${p.bars === 2 ? 'disabled' : ''} aria-label="Show bars 1 and 2, or bars 3 and 4">Bars 1 &amp; 2 <span class="toggle ${DP.half ? 'on' : ''}"><i></i></span> Bars 3 &amp; 4</button></div>
     <div class="dgrid8"><span></span><span class="ghead" style="grid-column:span 4">Bar ${off / 4 + 1}</span><span class="ghead" style="grid-column:span 4">Bar ${off / 4 + 2}</span>`;
@@ -53,7 +53,7 @@ function drumScreen() {
   }
   h += `</div>
     <div class="knobs"><span class="kl">${CZ.DRUMS[DP.selSnd]}<small>${smp ? esc(smp.name) : 'Built-in'}</small></span>${CZ.KNOBS.map((k, i) => `<div class="kn" data-k="${i}" role="slider" aria-label="${k}" aria-valuenow="${d.knobs[DP.selSnd][i]}">${knobSVG(d.knobs[DP.selSnd][i])}${k}</div>`).join('')}${ii('knobs')}</div>
-    <div class="sndb">${hx('&#9654; Listen', 'dp-listen')}${hx('Import Audio', 'dp-import')}${hx('Edit Sound', 'dp-editsnd', '', smp ? '' : 'disabled')}${hx('Reset Sound', 'dp-resetsnd', '', smp ? '' : 'disabled')}${ii('drumsound')}</div></div>
+    <div class="sndb">${hx('&#9654;&#xFE0E; Listen', 'dp-listen')}${hx('Import Audio', 'dp-import')}${hx('Edit Sound', 'dp-editsnd', '', smp ? '' : 'disabled')}${hx('Reset Sound', 'dp-resetsnd', '', smp ? '' : 'disabled')}${ii('drumsound')}</div></div>
   </div>`;
   return h + transport();
 }

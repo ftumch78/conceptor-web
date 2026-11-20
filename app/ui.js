@@ -135,8 +135,8 @@ function mixScreen() {
 function transport() {
   const s = S.song, playOn = S.playing && !S.recording;
   return `<div class="transport"><div class="row center"><span id="time" class="time"></span><span class="bpm" data-act="m-tempo">${Math.round(s.bpm)} BPM</span>${ii('transport')}</div><div class="tbtns">
-    ${hx('&#9198;', 'rew', 'big', 'aria-label="Back to start"')}
-    ${hx(playOn ? '&#9632;' : '&#9654;', 'play', 'big gplay ' + (playOn ? 'on' : ''), 'aria-label="Play or stop"')}
+    ${hx('&#9198;&#xFE0E;', 'rew', 'big', 'aria-label="Back to start"')}
+    ${hx(playOn ? '&#9632;&#xFE0E;' : '&#9654;&#xFE0E;', 'play', 'big gplay ' + (playOn ? 'on' : ''), 'aria-label="Play or stop"')}
     ${hx('&#9679;', 'rec', 'big ' + (S.recording ? 'rec' : 'grec'), 'aria-label="Record"')}
     ${hx('&#10227;', 'loop', 'big ' + (s.loop ? 'on' : ''), 'aria-label="Loop"')}
     ${hx('&#9650;', 'click', 'big ' + (s.click ? 'on' : ''), 'aria-label="Click"')}</div></div>`;
@@ -279,7 +279,7 @@ async function exTrim() {
   step({ title: 'Export', n: 1, total: 2, tip: 'demoexport', text: 'Trim the start and the end. Leave them to keep everything.',
     html: `<canvas id="trimWave" width="1360" height="160"></canvas>
       ${slider('Start', ex.a, 0, L, 0.1, 'ex.a', fmt(ex.a))}${slider('End', ex.b, 0, L, 0.1, 'ex.b', fmt(ex.b))}
-      <div class="row gap">${hx('&#9654; Play', 'ex-trimplay')}</div>`,
+      <div class="row gap">${hx('&#9654;&#xFE0E; Play', 'ex-trimplay')}</div>`,
     opts: [['Next', () => { S.stopListen(); exFormat('demo'); }]], onCancel: () => S.stopListen(), mount: drawTrimWave });
 }
 function drawTrimWave() {
@@ -437,7 +437,7 @@ async function openUM(tab = 'working', selId = null) {
     <div class="list" id="umList"></div><div class="now"><div class="t" id="umT"></div><div class="s" id="umS"></div>
     <canvas id="umWave" width="1360" height="200"></canvas>
     <div class="skip">${hx('&#8630; 10 s', 'um-b10', 'sm')}<span><span id="umPos">0:00</span> / <span id="umLen">0:00</span></span><span class="lbl">${ii('skip')}${hx('10 s &#8631;', 'um-f10', 'sm')}</span></div></div>
-    <div class="tbtns">${hx('&#9198;', 'um-prev', 'mid', 'aria-label="Previous"')}${hx('&#9632;', 'um-stop', 'mid', 'aria-label="Stop"')}${hx('&#9654;', 'um-play', 'big', 'id="umPlay" aria-label="Play or pause"')}${hx('&#8635;', 'um-loop', 'mid', 'id="umLoop" aria-label="Loop"')}${hx('&#9197;', 'um-next', 'mid', 'aria-label="Next"')}</div>
+    <div class="tbtns">${hx('&#9198;&#xFE0E;', 'um-prev', 'mid', 'aria-label="Previous"')}${hx('&#9632;&#xFE0E;', 'um-stop', 'mid', 'aria-label="Stop"')}${hx('&#9654;&#xFE0E;', 'um-play', 'big', 'id="umPlay" aria-label="Play or pause"')}${hx('&#8635;', 'um-loop', 'mid', 'id="umLoop" aria-label="Loop"')}${hx('&#9197;&#xFE0E;', 'um-next', 'mid', 'aria-label="Next"')}</div>
     <div class="vol"><span>Volume</span><input type="range" min="0" max="1" step="0.01" value="${um.vol}" id="umVol" aria-label="Playback volume">${ii('loop')}</div>`;
   $('#popActions').innerHTML = hx('Export', 'um-export', 'sm') + hx('Share', 'um-share', 'sm') + hx('Open Library', 'um-lib', 'sm') + ii('umactions');
   $('#umVol').oninput = (e) => { um.vol = +e.target.value; if (um.gain) um.gain.gain.value = um.vol; };
@@ -504,7 +504,7 @@ function umPlay() {
 function umPause() { if (um.playing) { um.pos = umNow(); um.playing = false; const s = um.src; um.src = null; try { s.stop(); } catch (e) {} } umIcons(); }
 function umStop() { umPause(); um.pos = 0; umDraw(); }
 function umSeek(t) { const was = um.playing; umPause(); um.pos = Math.max(0, Math.min(um.buf ? um.buf.duration : 0, t)); if (was) umPlay(); umDraw(); }
-function umIcons() { const b = $('#umPlay'); if (!b) return; b.classList.toggle('on', um.playing); b.querySelector('span').innerHTML = um.playing ? '&#10074;&#10074;' : '&#9654;'; }
+function umIcons() { const b = $('#umPlay'); if (!b) return; b.classList.toggle('on', um.playing); b.querySelector('span').innerHTML = um.playing ? '&#10074;&#10074;' : '&#9654;&#xFE0E;'; }
 function umCur() { return um.items[um.sel]; }
 function umExport() {
   const m = umCur(); if (!m || !um.buf) return;
@@ -558,8 +558,8 @@ function openDed(v) {
 }
 const cand = { list: [] };
 function drumImport(v, back, two) {
-  const rows = cand.list.map((f, k) => `<div class="row"><div class="grow">${esc(f.name)}<div class="sub">${f.audio.length / S.sr < 10 ? (f.audio.length / S.sr).toFixed(2) + ' s' : fmt(f.audio.length / S.sr)}</div></div>${hx('&#9654; Listen', 'cl-' + k, 'sm')}${hx('Use', 'cu-' + v + '-' + k, 'sm on')}</div>`).join('');
-  const lib = S.song.tracks.map((t, i) => t.audio ? `<div class="row"><div class="grow">${esc(t.name)}<div class="sub">Track ${i + 1} of this song, first 4 seconds</div></div>${hx('&#9654; Listen', 'tl-' + i, 'sm')}${hx('Use', 'tu-' + v + '-' + i, 'sm on')}</div>` : '').join('');
+  const rows = cand.list.map((f, k) => `<div class="row"><div class="grow">${esc(f.name)}<div class="sub">${f.audio.length / S.sr < 10 ? (f.audio.length / S.sr).toFixed(2) + ' s' : fmt(f.audio.length / S.sr)}</div></div>${hx('&#9654;&#xFE0E; Listen', 'cl-' + k, 'sm')}${hx('Use', 'cu-' + v + '-' + k, 'sm on')}</div>`).join('');
+  const lib = S.song.tracks.map((t, i) => t.audio ? `<div class="row"><div class="grow">${esc(t.name)}<div class="sub">Track ${i + 1} of this song, first 4 seconds</div></div>${hx('&#9654;&#xFE0E; Listen', 'tl-' + i, 'sm')}${hx('Use', 'tu-' + v + '-' + i, 'sm on')}</div>` : '').join('');
   step({ title: 'Import Audio', n: two ? 2 : 1, total: two ? 2 : 1, back,
     text: `Listen first, then press Use to replace ${CZ.DRUMS[v]}.`,
     html: `<div class="row plain">${hx('Choose files on this device', 'cfiles-' + v, 'sm')}</div>${rows}${lib ? '<div class="section">FROM THIS SONG</div>' + lib : ''}`, opts: [] });
