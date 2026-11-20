@@ -452,7 +452,7 @@ CZ.TIPS = {
   placeholder: ['Placeholder', 'Fills the whole song row with this pattern, 4 minutes long.'],
   songname: ['Song name', 'Tap the name to rename the song. New songs are called "Untitled" plus the date until they are named.'],
   master: ['Master', 'Volume of the whole mix. The two bars show the left and right level.'],
-  tracks: ['Tracks', 'Each row is one track. R arms it for recording, M mutes it, S solos it. FX opens its effects. The hexagon with three dots has Import Audio, Edit, Copy To Song and Rename.'],
+  tracks: ['Tracks', 'Each row is one track. R arms it for recording, M mutes it, S solos it. FX opens its effects. The ⋯ button has Import Audio, Edit, Copy To Song and Rename.'],
   addtrack: ['Add track', 'Adds another track. Up to 12.'],
   transport: ['Transport', 'Rewind, Play or Stop, Record, Loop and Click. Record needs a track with R on.'],
   shortcuts: ['Shortcuts', 'Open Edit Mode, the drum grid, mastering, export, the Library and the Ultrasound Machine.'],

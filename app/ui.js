@@ -10,7 +10,7 @@ const isPhone = () => /iPhone|iPad|Android/.test(navigator.userAgent) || (naviga
 let bannerTimer = null;
 function say(t) { const b = $('#banner'); b.textContent = t; b.style.display = 'block'; clearTimeout(bannerTimer); bannerTimer = setTimeout(() => { b.style.display = 'none'; }, 3500); }
 
-// ------------------------------------------------------------------ small pieces (every button is a hexagon)
+// ------------------------------------------------------------------ small pieces (capsule and round buttons; hexagons only in the menu)
 const hx = (label, act, cls = '', extra = '') => `<button class="hex ${cls}" data-act="${act}" ${extra}><span>${label}</span></button>`;
 const ii = (k) => `<button class="info" data-tip="${k}" aria-label="About this">i</button>`;
 const sw = (on, act) => `<button class="sw ${on ? 'on' : ''}" data-act="${act}" aria-pressed="${on}"><i></i></button>`;
@@ -602,7 +602,7 @@ Ultrasound Machine
 Plays working mixes and final mixes. Export and Share are there too.
 
 Home
-The Home button (the hexagons) returns to the main screen from anywhere.
+The Home button (with the beehive) returns to the main screen from anywhere.
 
 Limits
 Twelve tracks. Each track holds up to four minutes. One stereo output.`;
