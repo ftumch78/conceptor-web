@@ -65,7 +65,7 @@ jobs:
 
       - name: Picture of the app (for the guide)
         run: |
-          f=$(ls out/smoke-*.png | head -1); echo "PNG-BEGIN"; base64 "$f" | tr -d '\n'; echo; echo "PNG-END"
+          f=$(ls out/smoke-*.png | head -1); echo "PNG-BEGIN"; base64 < "$f" | tr -d '\n'; echo; echo "PNG-END"
       - uses: actions/upload-artifact@v4
         with:
           name: conceptor-${{ runner.os }}
