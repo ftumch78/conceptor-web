@@ -40,7 +40,7 @@
 <header>
   <img src="app/art.jpg" alt="">
   <h1>CONCEPTOR</h1>
-  <p class="sub">Record ideas. Twelve tracks, with amps, pedals, effects, a drum programmer and mastering built in. Version 0.4.1: Birthing Unit colours, drum programmer with the song row under the pattern cards and 2 or 4 bar patterns, Placeholder pattern, Demo Mode and Polished Mode.</p>
+  <p class="sub">Record ideas. Twelve tracks, with amps, pedals, effects, a drum programmer and mastering built in. Version 0.4.2: Windows and Mac apps, Birthing Unit colours, drum programmer with the song row under the pattern cards and 2 or 4 bar patterns, Placeholder pattern, Demo Mode and Polished Mode.</p>
 </header>
 
 <a class="big" href="app/">Open Conceptor</a>
@@ -53,7 +53,7 @@
   <p class="note">Choose your device. The steps show one at a time.</p>
   <button data-go="ios">iPhone or iPad<span>Add to the home screen from Safari</span></button>
   <button data-go="android">Android phone<span>The Android app, or the web app from Chrome</span></button>
-  <button data-go="computer">Mac or PC<span>Install from Chrome or Edge, or add to the Dock in Safari</span></button>
+  <button data-go="computer">Mac or PC<span>The Windows or Mac app, or use it in Chrome or Edge</span></button>
 </section>
 
 <section id="ios" hidden>
@@ -92,24 +92,32 @@
 </section>
 
 <section id="computer" hidden>
-  <div class="step"><div class="count">MAC OR PC · STEP 1 OF 3</div><h2>Open Conceptor in Chrome or Edge</h2>
-    <ul><li>Go to <b>ftumch78.github.io/conceptor-web</b></li><li>Click <b>Open Conceptor</b>.</li></ul></div>
-  <div class="step"><div class="count">MAC OR PC · STEP 2 OF 3</div><h2>Click the Install icon</h2>
-    <ul><li>Click the small install icon at the right end of the address bar <span class="orange">1</span>.</li>
-      <li>Click <b>Install</b> <span class="orange">2</span>.</li>
-      <li>Conceptor gets its own window and an icon in the Dock (Mac) or Start menu (PC).</li></ul>
+  <div class="step"><div class="count">MAC OR PC · STEP 1 OF 3</div><h2>Windows: install the Conceptor app</h2>
+    <ul><li>Windows 10 or 11.</li><li>On the download page, click <b>Conceptor-0.4.2-Windows-Setup.exe</b>.</li><li>Open the downloaded file.</li>
+      <li>If a blue box says "Windows protected your PC": click <b>More info</b>, then <b>Run anyway</b> <span class="orange">2</span>.</li>
+      <li>Conceptor installs and opens. It has an icon on the desktop and in the Start menu.</li></ul>
+    <a class="big" href="https://github.com/ftumch78/conceptor-web/releases/latest">Windows and Mac apps 0.4.2: download page</a>
+    <img src="img/win_ss2.svg" alt="Windows protected your PC: Run anyway"></div>
+  <div class="step"><div class="count">MAC OR PC · STEP 2 OF 3</div><h2>Mac: install the Conceptor app</h2>
+    <ul><li>macOS 10.15 Catalina or later. Intel or Apple Silicon.</li><li>On the download page, click <b>Conceptor-0.4.2-Mac.dmg</b>.</li>
+      <li>Open the downloaded file. Drag <b>Conceptor</b> onto <b>Applications</b> <span class="orange">1</span>.</li>
+      <li>The first time only: in Applications, right-click (or Control-click) Conceptor, click <b>Open</b>, then <b>Open</b> again.</li>
+      <li>Click <b>OK</b> when it asks for the microphone.</li></ul>
+    <a class="big" href="https://github.com/ftumch78/conceptor-web/releases/latest">Windows and Mac apps 0.4.2: download page</a>
+    <img src="img/mac_dmg.svg" alt="Drag Conceptor onto Applications"></div>
+  <div class="step"><div class="count">MAC OR PC · STEP 3 OF 3</div><h2>Or use it in Chrome or Edge</h2>
+    <ul><li>No download needed. Go to <b>ftumch78.github.io/conceptor-web</b> and click <b>Open Conceptor</b>.</li>
+      <li>To give it its own window: click the small install icon at the right end of the address bar <span class="orange">1</span>, then <b>Install</b> <span class="orange">2</span>.</li>
+      <li>Songs in the browser and songs in the installed app are kept separately. Use the Library sync folder, or Export and Import Audio, to move them across.</li></ul>
     <img src="img/chrome_install.svg" alt="Install icon in Chrome"></div>
-  <div class="step"><div class="count">MAC OR PC · STEP 3 OF 3</div><h2>Safari on a Mac</h2>
-    <ul><li>macOS Sonoma or later: open Conceptor in Safari, then <b>File</b>, <b>Add to Dock</b>.</li>
-      <li>Older Macs (for example Catalina): use Conceptor in a Safari or Chrome window. Keep a bookmark to it.</li>
-      <li>Allow the microphone when asked.</li></ul></div>
 </section>
 
 <div class="nav" id="nav" hidden><button id="back">Back</button><button id="next" class="next">Next</button></div>
 
 <h2 style="margin-top:30px">Guides</h2>
 <ul>
-  <li><a href="guides/Conceptor-0.4.1-Install-and-Update.html">Install and update to 0.4.1</a> (click-through)</li>
+  <li><a href="guides/Conceptor-0.4.2-Install-and-Update.html">Install and update to 0.4.2</a> (click-through)</li>
+  <li><a href="guides/Conceptor-0.4.1-Install-and-Update.html">Install and update to 0.4.1</a> (older)</li>
   <li><a href="guides/Conceptor-0.4-Install-and-Update.html">Install and update to 0.4</a> (older)</li>
   <li><a href="guides/Conceptor-0.3-Install-and-Update.html">Install and update to 0.3</a> (older)</li>
   <li><a href="guides/Conceptor-0.2-Install-Instructions.html">Install instructions</a> (<a href="guides/Conceptor-0.2-Install-Instructions.pdf">PDF</a>)</li>

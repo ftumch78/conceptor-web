@@ -10,6 +10,7 @@ const isPhone = () => /iPhone|iPad|Android/.test(navigator.userAgent) || (naviga
 let bannerTimer = null;
 function say(t) { const b = $('#banner'); b.textContent = t; b.style.display = 'block'; clearTimeout(bannerTimer); bannerTimer = setTimeout(() => { b.style.display = 'none'; }, 3500); }
 
+// drawn icons for back-to-start and next (Windows shows the text symbols as colour emoji)
 // ------------------------------------------------------------------ small pieces (capsule and round buttons; hexagons only in the menu)
 const hx = (label, act, cls = '', extra = '') => `<button class="hex ${cls}" data-act="${act}" ${extra}><span>${label}</span></button>`;
 const ii = (k) => `<button class="info" data-tip="${k}" aria-label="About this">i</button>`;
@@ -135,7 +136,7 @@ function mixScreen() {
 function transport() {
   const s = S.song, playOn = S.playing && !S.recording;
   return `<div class="transport"><div class="row center"><span id="time" class="time"></span><span class="bpm" data-act="m-tempo">${Math.round(s.bpm)} BPM</span>${ii('transport')}</div><div class="tbtns">
-    ${hx('&#9198;&#xFE0E;', 'rew', 'big', 'aria-label="Back to start"')}
+    ${hx('<svg width="14" height="12" viewBox="0 0 14 12" aria-hidden="true"><rect x="0" y="0" width="2.4" height="12" fill="currentColor"/><path d="M8 0 L2.4 6 L8 12 Z M14 0 L8.4 6 L14 12 Z" fill="currentColor"/></svg>', 'rew', 'big', 'aria-label="Back to start"')}
     ${hx(playOn ? '&#9632;&#xFE0E;' : '&#9654;&#xFE0E;', 'play', 'big gplay ' + (playOn ? 'on' : ''), 'aria-label="Play or stop"')}
     ${hx('&#9679;', 'rec', 'big ' + (S.recording ? 'rec' : 'grec'), 'aria-label="Record"')}
     ${hx('&#10227;', 'loop', 'big ' + (s.loop ? 'on' : ''), 'aria-label="Loop"')}
@@ -437,7 +438,7 @@ async function openUM(tab = 'working', selId = null) {
     <div class="list" id="umList"></div><div class="now"><div class="t" id="umT"></div><div class="s" id="umS"></div>
     <canvas id="umWave" width="1360" height="200"></canvas>
     <div class="skip">${hx('&#8630; 10 s', 'um-b10', 'sm')}<span><span id="umPos">0:00</span> / <span id="umLen">0:00</span></span><span class="lbl">${ii('skip')}${hx('10 s &#8631;', 'um-f10', 'sm')}</span></div></div>
-    <div class="tbtns">${hx('&#9198;&#xFE0E;', 'um-prev', 'mid', 'aria-label="Previous"')}${hx('&#9632;&#xFE0E;', 'um-stop', 'mid', 'aria-label="Stop"')}${hx('&#9654;&#xFE0E;', 'um-play', 'big', 'id="umPlay" aria-label="Play or pause"')}${hx('&#8635;', 'um-loop', 'mid', 'id="umLoop" aria-label="Loop"')}${hx('&#9197;&#xFE0E;', 'um-next', 'mid', 'aria-label="Next"')}</div>
+    <div class="tbtns">${hx('<svg width="14" height="12" viewBox="0 0 14 12" aria-hidden="true"><rect x="0" y="0" width="2.4" height="12" fill="currentColor"/><path d="M8 0 L2.4 6 L8 12 Z M14 0 L8.4 6 L14 12 Z" fill="currentColor"/></svg>', 'um-prev', 'mid', 'aria-label="Previous"')}${hx('&#9632;&#xFE0E;', 'um-stop', 'mid', 'aria-label="Stop"')}${hx('&#9654;&#xFE0E;', 'um-play', 'big', 'id="umPlay" aria-label="Play or pause"')}${hx('&#8635;', 'um-loop', 'mid', 'id="umLoop" aria-label="Loop"')}${hx('<svg width="14" height="12" viewBox="0 0 14 12" aria-hidden="true"><path d="M0 0 L5.6 6 L0 12 Z M6 0 L11.6 6 L6 12 Z" fill="currentColor"/><rect x="11.6" y="0" width="2.4" height="12" fill="currentColor"/></svg>', 'um-next', 'mid', 'aria-label="Next"')}</div>
     <div class="vol"><span>Volume</span><input type="range" min="0" max="1" step="0.01" value="${um.vol}" id="umVol" aria-label="Playback volume">${ii('loop')}</div>`;
   $('#popActions').innerHTML = hx('Export', 'um-export', 'sm') + hx('Share', 'um-share', 'sm') + hx('Open Library', 'um-lib', 'sm') + ii('umactions');
   $('#umVol').oninput = (e) => { um.vol = +e.target.value; if (um.gain) um.gain.gain.value = um.vol; };
