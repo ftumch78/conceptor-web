@@ -67,15 +67,14 @@ CZ.DRUM_PATTERNS = [
 CZ.newSong = function (name) {
   const tracks = [];
   for (let t = 0; t < CZ.TRACKS; t++) {
-    tracks.push({ name: 'Track ' + (t + 1), vol: 0, pan: 0, trim: 0, mute: false, solo: false, arm: false, fi: 0, fo: 0,
-      fx: CZ.UNITS.map((_, u) => ({ on: false, variant: 0, vals: CZ.defaults(u, 0) })), audio: null });
+    tracks.push({ name: 'Track ' + (t + 1), vol: 0, pan: 0, trim: 0, gain: 0, mute: false, solo: false, arm: false, fi: 0, fo: 0, input: '1',
+      fx: CZ.newFx('track'), audio: null, audioR: null });
   }
   return {
-    name, tracks, shown: 4, masterVol: 0, bpm: 100, click: false, loop: false, loopStart: 0, loopEnd: 0,
+    name, tracks, shown: 1, masterVol: 0, v043: true, bpm: 100, click: false, loop: false, loopStart: 0, loopEnd: 0,
     drums: CZ.newDrums(),
     exports: [], created: CZ.today(), mode: 'demo',
-    master: { on: false, gain: 3, ceiling: -1, eq: { on: false, variant: 0, vals: CZ.defaults(4, 0) },
-      comp: { on: true, variant: 1, vals: [25, 2, 1] } },
+    master: CZ.newFx('master'),
   };
 };
 CZ.applyPreset = function (song, k) {
@@ -92,9 +91,10 @@ CZ.PCOL = CZ.TRACKCOL;   // pattern colours follow the track colours
 CZ.LANECOL = ['#EAB592', '#A2C9E8', '#E5AAB9', '#9AD6C5', '#F0D68C', '#B9AAE0', '#A2C9E8', '#E2BF6A'];
 CZ.KNOBS = ['Pitch', 'Tone', 'Length', 'Level'];
 CZ.emptySteps = () => Array.from({ length: CZ.NDRUMS }, () => new Array(16).fill(false));
-CZ.newDrums = () => ({ vol: -6, patterns: [{ id: 1, name: 'Pattern 1', color: CZ.PCOL[0], ph: false, bars: 4, steps: CZ.emptySteps() }], nextId: 2, sel: 1,
+CZ.newDrums = () => ({ vol: -6, ch: { vol: -6, pan: 0, mute: false, solo: false, fx: CZ.newFx('drum') }, ms: Array.from({ length: CZ.NDRUMS }, () => ({ m: false, s: false })), patterns: [{ id: 1, name: 'Pattern 1', color: CZ.PCOL[0], ph: false, bars: 4, steps: CZ.emptySteps() }], nextId: 2, sel: 1,
   comp: [], phLen: 240, knobs: Array.from({ length: CZ.NDRUMS }, () => [50, 50, 50, 80]), samples: new Array(CZ.NDRUMS).fill(null) });
 CZ.newPattern = (d, steps) => { const id = d.nextId++; const p = { id, name: 'Pattern ' + id, color: CZ.PCOL[(id - 1) % CZ.PCOL.length], ph: false, bars: 4, steps: steps || CZ.emptySteps() }; d.patterns.push(p); return p; };
+CZ.drumAudible = (d, v) => { const ms = d.ms; if (!ms) return true; if (ms[v].m) return false; return !ms.some((x) => x.s) || ms[v].s; };
 CZ.pat = (d, id) => d.patterns.find((x) => x.id === id);
 CZ.selPattern = (song) => CZ.pat(song.drums, song.drums.sel) || song.drums.patterns[0];
 // 0.4.1: on the grid one bar = a group of 4 squares; each square is a sixteenth note. A pattern is 2 or 4 bars (8 or 16 squares).
@@ -443,7 +443,7 @@ CZ.encodeMp3 = function (channels, sr) {
 };
 
 // ------------------------------------------------------------------ 0.3: names, fades, peaks, editing
-CZ.VERSION = '0.4.2';
+CZ.VERSION = '0.4.3';
 CZ.MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 CZ.today = () => { const d = new Date(); return d.getDate() + ' ' + CZ.MONTHS[d.getMonth()] + ' ' + d.getFullYear(); };
 CZ.uniqueName = (base, list) => { if (!list.includes(base)) return base; let k = 2; while (list.includes(base + ' (' + k + ')')) k++; return base + ' (' + k + ')'; };

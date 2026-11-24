@@ -1,6 +1,6 @@
 // Keeps Conceptor working without an internet connection once it has been opened.
-const CACHE = 'conceptor-0.4.2';
-const FILES = ['./', 'index.html', 'style.css', 'engine.js', 'studio.js', 'ui.js', 'editor.js', 'drums.js', 'worklets.js', 'lame.min.js', 'art.jpg', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'manifest.webmanifest'];
+const CACHE = 'conceptor-0.4.3';
+const FILES = ['./', 'index.html', 'style.css', 'engine.js', 'studio.js', 'mix.js', 'ui.js', 'drums.js', 'lib.js', 'worklets.js', 'lame.min.js', 'art.jpg', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'manifest.webmanifest'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', (e) => {

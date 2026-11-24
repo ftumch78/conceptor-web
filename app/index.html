@@ -15,19 +15,24 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div id="app"></div>
-<div id="pop" class="popup"></div>
-<div id="dialog" class="dlg"></div>
-<div id="dialog2" class="dlg"></div>
-<div id="tip" class="tip" role="dialog"><h4 id="tipT"></h4><p id="tipP"></p><button class="hex" data-act="got-it"><span>Got it</span></button></div>
-<div id="banner" role="status"></div>
+<div class="dev" id="dev">
+  <div id="app"></div>
+  <div class="rotate"><svg width="70" height="70" viewBox="0 0 70 70" fill="none" stroke="#E2BF6A" stroke-width="3"><rect x="22" y="8" width="26" height="44" rx="4"/><path d="M14 54 a26 26 0 0 0 42 0" /><path d="M52 50 l4 4 l4 -5"/></svg>Turn the phone sideways.<span class="dim">Conceptor works in landscape.</span></div>
+  <div class="menu" id="menu" onclick="if(event.target===this)closeMenu()"><div class="pan" id="menuPan"></div></div>
+  <div class="pop" id="pop"><div class="sheet"><div class="sh" id="popH"></div><div class="sb" id="popB" data-keep="popB"></div></div></div>
+  <div class="dlg" id="dlg"><div class="box"></div></div>
+  <div class="tip" id="tip" role="dialog"><h4 id="tipT"></h4><p id="tipP"></p><button class="b" onclick="document.getElementById('tip').classList.remove('show')">Got it</button></div>
+  <div class="toast" id="toast" role="status"></div>
+  <div class="htip" id="htip"></div>
+</div>
 <input type="file" id="file" accept="audio/*" hidden>
 <noscript>Conceptor needs JavaScript switched on.</noscript>
 <script src="lame.min.js"></script>
 <script src="engine.js"></script>
+<script src="mix.js"></script>
 <script src="studio.js"></script>
-<script src="editor.js"></script>
 <script src="ui.js"></script>
 <script src="drums.js"></script>
+<script src="lib.js"></script>
 </body>
 </html>

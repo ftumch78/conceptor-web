@@ -23,9 +23,11 @@ class Studio {
     await unlock;
     this.drumBufs = CZ.drumBuffers(this.ctx); this.clickBufs = CZ.clickBuffers(this.ctx);
     this.master = CZ.makeMaster(this.ctx, this.ctx.destination);
-    this.drumGain = this.ctx.createGain(); this.drumGain.connect(this.master.input);
+    this.drumStrip = CZ.makeStrip(this.ctx, this.master.input, 'drum');
+    this.drumGain = this.ctx.createGain(); this.drumGain.connect(this.drumStrip.trim);
     this.clickGain = this.ctx.createGain(); this.clickGain.connect(this.ctx.destination);
     this.strips = []; for (let t = 0; t < CZ.TRACKS; t++) this.strips.push(CZ.makeStrip(this.ctx, this.master.input));
+    if (this.outputId && this.ctx.setSinkId) { try { await this.ctx.setSinkId(this.outputId); } catch (e) {} }
     if (this.ctx.state !== 'running') await this.ctx.resume();
     if (this.song) { this.fitRate(); this.applyAll(); }
   }
@@ -48,13 +50,19 @@ class Studio {
     if (this.micNode) return true;
     try {
       this.micStream = await navigator.mediaDevices.getUserMedia({ audio: {
-        deviceId: this.inputId ? { exact: this.inputId } : undefined, echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+        deviceId: this.inputId ? { exact: this.inputId } : undefined, channelCount: { ideal: 2 }, echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
     } catch (e) { return false; }
     this.micNode = this.ctx.createMediaStreamSource(this.micStream);
     this.recNode = new AudioWorkletNode(this.ctx, 'cz-recorder', { numberOfOutputs: 0 });
     this.micNode.connect(this.recNode);
     this.recNode.port.onmessage = (e) => this.onRecData(e.data);
-    this.monitorGains = this.strips.map((s) => { const g = this.ctx.createGain(); g.gain.value = 0; this.micNode.connect(g); g.connect(s.trim); return g; });
+    // Input 1 and Input 2 are the first two channels of the chosen device
+    this.micChannels = (this.micStream.getAudioTracks()[0].getSettings() || {}).channelCount || 1;
+    this.micSplit = this.ctx.createChannelSplitter(2); this.micNode.connect(this.micSplit);
+    this.inAn = [0, 1].map((c) => { const a = this.ctx.createAnalyser(); a.fftSize = 2048; this.micSplit.connect(a, c); return a; });
+    this.monitors = this.strips.map((s) => {
+      const g = this.ctx.createGain(), m = this.ctx.createChannelMerger(2), one = this.ctx.createGain(); g.gain.value = 0; one.channelCount = 1; one.channelCountMode = 'explicit';
+      g.connect(s.trim); return { g, m, one, key: '' }; });
     this.applyAll();
     return true;
   }
@@ -62,7 +70,7 @@ class Studio {
     if (!this.micNode) return;
     this.micStream.getTracks().forEach((t) => t.stop());
     try { this.micNode.disconnect(); } catch (e) {}
-    this.micNode = null; this.recNode = null; this.monitorGains = null;
+    this.micNode = null; this.recNode = null; this.monitors = null; this.micSplit = null; this.inAn = null;
   }
   async inputs() {
     try { const d = await navigator.mediaDevices.enumerateDevices(); return d.filter((x) => x.kind === 'audioinput'); } catch (e) { return []; }
@@ -71,14 +79,26 @@ class Studio {
   // ------------------------------------------------------------------ applying the song to the audio graph
   applyAll() {
     if (!this.ctx || !this.song) return;
-    const anySolo = this.song.tracks.some((t) => t.solo);
+    const anySolo = this.song.tracks.some((t) => t.solo) || this.song.drums.ch.solo;
     this.song.tracks.forEach((t, i) => {
       this.strips[i].apply(t, !t.mute && (!anySolo || t.solo));
-      if (this.monitorGains) this.monitorGains[i].gain.value = t.arm ? 1 : 0;
+      if (this.monitors) this.wireMonitor(i, t.arm ? t.input : 'none');
     });
+    const d = this.song.drums, ch = d.ch;
+    this.drumStrip.apply({ vol: ch.vol, pan: ch.pan, trim: 0, fx: ch.fx }, !ch.mute && (!anySolo || ch.solo));
     this.master.apply(this.song, this.masterOn());
-    this.drumGain.gain.value = CZ.dbToGain(this.song.drums.vol);
   }
+  // hearing the input on an armed track: Input 1, Input 2, both (stereo) or none
+  wireMonitor(i, input) {
+    const m = this.monitors[i]; if (m.key === input) return;
+    try { this.micSplit.disconnect(m.one); } catch (e) {} try { this.micSplit.disconnect(m.m); } catch (e) {}
+    try { m.one.disconnect(); } catch (e) {} try { m.m.disconnect(); } catch (e) {}
+    m.g.gain.value = input === 'none' ? 0 : 1;
+    if (input === '1' || input === '2') { this.micSplit.connect(m.one, input === '1' ? 0 : 1); m.one.connect(m.g); }
+    else if (input === '12') { this.micSplit.connect(m.m, 0, 0); this.micSplit.connect(m.m, 1, 1); m.m.connect(m.g); }
+    m.key = input;
+  }
+  inputLevel(c) { const a = this.inAn && this.inAn[c]; if (!a) return 0; const b = new Float32Array(a.fftSize); a.getFloatTimeDomainData(b); let m = 0; for (const x of b) m = Math.max(m, Math.abs(x)); return m; }
   changed(what) { this.dirty = true; this.applyAll(); this.emit(what || 'change'); this.scheduleSave(); }
 
   // ------------------------------------------------------------------ transport
@@ -86,7 +106,7 @@ class Studio {
   length() { return Math.max(CZ.songLength(this.song) / this.sr, CZ.rowSec(this.song)); }
   polished() { return this.song && this.song.mode === 'polished'; }
   // Demo Mode has no mastering. The settings are kept for when the song goes back to Polished.
-  masterOn() { return !!(this.song && this.song.master.on && this.polished()); }
+  masterOn() { return this.polished(); }
   loopRange() {
     const s = this.song; const L = this.length();
     if (s.loopEnd > s.loopStart + 0.05) return [s.loopStart, s.loopEnd];
@@ -111,14 +131,14 @@ class Studio {
     this.sources = []; clearInterval(this.timer); this.timer = null;
     this.playing = false; this.drumStep = -1; this.drumBlock = -1; this.rangeEnd = null;
     if (this.previewPat) { this.previewPat = null; this.pos = 0; }
-    if (this.dropMon != null && this.monitorGains) { this.monitorGains[this.dropMon].gain.value = this.song.tracks[this.dropMon].arm ? 1 : 0; this.dropMon = null; }
     if (this.recording) this.finishRecording();
+    if (this.dropArm) { const a = this.dropArm; this.dropArm = null; this.song.tracks.forEach((t, i) => { t.arm = a[i]; }); this.dropTrack = null; this.applyAll(); }
     this.emit('transport');
   }
+  // |<< stops playback or recording and goes to 0:00. It never starts playback.
   rewind() {
-    const was = this.playing; if (was) this.stop();
-    this.pos = this.song.loop ? this.loopRange()[0] : 0;
-    if (was) this.play();
+    if (this.playing) this.stop();
+    this.pos = 0;
     this.emit('transport');
   }
   // plays the tracks from song time p, starting at context time at
@@ -128,8 +148,9 @@ class Studio {
     if (this.previewPat) { this.schedFrom = p; return; }
     this.song.tracks.forEach((t, i) => {
       if (!t.audio || t.audio.length / sr <= p) return;
-      const audio = this.override && this.override.i === i ? this.override.audio : CZ.trackAudio(t, sr);
-      const b = this.ctx.createBuffer(1, audio.length, sr); b.getChannelData(0).set(audio);
+      let chs = CZ.trackChannels(t, sr);
+      if (this.cutAt && this.cutAt.tracks.includes(i)) chs = chs.map((c) => { const x = c.slice(); x.fill(0, Math.round(this.cutAt.t * sr)); return x; });
+      const b = this.ctx.createBuffer(chs.length, chs[0].length, sr); chs.forEach((c, k) => b.getChannelData(k).set(c));
       const src = this.ctx.createBufferSource(); src.buffer = b; src.connect(this.strips[i].trim);
       src.start(at, p); this.sources.push(src);
     });
@@ -173,7 +194,7 @@ class Studio {
         let p = null, st = -1, blkI = -1;
         if (this.previewPat) { p = CZ.pat(d, this.previewPat); const n = CZ.patSteps(p); st = ((nb % n) + n) % n; }
         else { const b = nb >= 0 ? CZ.blockAt(s, nb) : null; if (b) { blkI = b.i; st = b.st; p = CZ.pat(d, d.comp[b.i].p); } }
-        if (p && st >= 0) for (let v = 0; v < CZ.NDRUMS; v++) if (p.steps[v][st]) this.playDrum(v, at);
+        if (p && st >= 0) for (let v = 0; v < CZ.NDRUMS; v++) if (p.steps[v][st] && CZ.drumAudible(d, v)) this.playDrum(v, at);
         if (st === 0 || (!p && this.drumBlock >= 0)) { const bb = blkI; setTimeout(() => { if (this.playing) { this.drumBlock = bb; this.emit('block'); } }, Math.max(0, (at - ctx.currentTime) * 1000)); }
         const beatSt = ((nb % 16) + 16) % 16;
         if (s.click && beatSt % 4 === 0) this.playBuf(this.clickBufs[beatSt === 0 ? 0 : 1], this.clickGain, at);
@@ -199,23 +220,44 @@ class Studio {
   }
 
   // ------------------------------------------------------------------ recording
-  async record() {
+  // Records every armed track (two at most), each from its own input. opts.from: recording starts there, playback starts opts.runFrom.
+  async record(opts) {
     if (this.recording) { this.stop(); return 'stopped'; }
     await this.startAudio();
-    const armed = this.song.tracks.map((t, i) => (t.arm ? i : -1)).filter((i) => i >= 0);
-    if (!armed.length) return 'noarm';
+    const armed = this.song.tracks.map((t, i) => (t.arm && t.input !== 'none' ? i : -1)).filter((i) => i >= 0);
+    if (!armed.length) return this.song.tracks.some((t) => t.arm) ? 'noinput' : 'noarm';
     if (!(await this.openMic())) return 'nomic';
     if (this.playing) this.stop();
-    this.undo = armed.map((i) => ({ i, audio: this.song.tracks[i].audio ? this.song.tracks[i].audio.slice() : null }));
-    this.recChunks = []; this.recArmed = armed; this.recPos = this.pos;
+    this.stopListen();
+    this.applyAll();
+    const from = opts ? opts.from : this.pos, runFrom = opts ? opts.runFrom : this.pos;
+    this.undo = armed.map((i) => { const t = this.song.tracks[i]; return { i, audio: t.audio ? t.audio.slice() : null, audioR: t.audioR ? t.audioR.slice() : null, fi: t.fi, fo: t.fo }; });
+    this.recChunks = []; this.recArmed = armed; this.recPos = from; this.recFrom = from;
+    this.pos = runFrom;
     const at = this.ctx.currentTime + 0.1;
-    this.recNode.port.postMessage({ rec: true, at });
-    this.startSegment(at, this.pos);
+    this.recNode.port.postMessage({ rec: true, at: at + (from - runFrom) });
+    this.cutAt = opts ? { tracks: armed, t: from } : null;   // Drop In: the old part is not heard from the cursor on
+    this.startSegment(at, runFrom);
+    this.cutAt = null;
     this.playing = true; this.recording = true;
     this.timer = setInterval(() => this.tick(), 25);
     this.emit('transport');
     return 'ok';
   }
+  // Drop In: records on track i only, from the cursor, after a run-up of `runUp` seconds (shorter near the start)
+  async dropIn(i, runUp) {
+    if (this.recording) { this.stop(); return 'stopped'; }
+    const from = this.pos;
+    this.dropArm = this.song.tracks.map((t) => t.arm);
+    this.song.tracks.forEach((t, k) => { t.arm = k === i; });
+    if (this.song.tracks[i].input === 'none') this.song.tracks[i].input = '1';
+    this.dropTrack = i;
+    const r = await this.record({ from, runFrom: Math.max(0, from - runUp) });
+    if (r !== 'ok') { const a = this.dropArm; this.dropArm = null; this.dropTrack = null; this.song.tracks.forEach((t, k) => { t.arm = a[k]; }); this.applyAll(); }
+    return r;
+  }
+  // seconds until recording starts (Drop In run-up); 0 when recording or not recording
+  countIn() { return this.recording ? Math.max(0, this.recFrom - this.now()) : 0; }
   onRecData(d) {
     if (d.data) this.recChunks.push(d.data);
     if (d.done) this.placeRecording();
@@ -223,38 +265,39 @@ class Studio {
   finishRecording() { this.recording = false; if (this.recNode) this.recNode.port.postMessage({ rec: false }); }
   placeRecording() {
     const sr = this.sr;
-    let n = 0; for (const c of this.recChunks) n += c.length;
-    const all = new Float32Array(n); let o = 0; for (const c of this.recChunks) { all.set(c, o); o += c.length; }
+    const join = (c) => CZ.concat(this.recChunks.map((x) => x[c]));
+    const ch = [join(0), join(1)], n = ch[0].length;
     const lat = (this.ctx.baseLatency || 0) + (this.ctx.outputLatency || 0) + this.offsetMs / 1000;
     const shift = Math.round(lat * sr);
-    if (this.drop) {   // Drop In: hand back only the chosen part, nothing is placed yet
-      const d = this.drop; this.drop = null; this.recChunks = [];
-      const g = Math.pow(10, this.song.tracks[d.i].trim / 20);
-      const take = new Float32Array(d.b - d.a);
-      const base = d.a - Math.round(this.recPos * sr) + shift;
-      for (let k = 0; k < take.length; k++) { const j = base + k; take[k] = j >= 0 && j < n ? all[j] * g : d.orig[k]; }
-      d.done(take); return;
-    }
-    const start = Math.round(this.recPos * sr);
-    const max = CZ.MAX_SECONDS * sr;
+    const start = Math.round(this.recPos * sr), max = CZ.MAX_SECONDS * sr;
+    const put = (old, src, end, g) => {
+      const a = new Float32Array(end); if (old) a.set(old.subarray(0, Math.min(old.length, end)));
+      for (let k = shift; k < n; k++) { const w = start + k - shift; if (w >= 0 && w < end) a[w] = src[k] * g; }
+      return a;
+    };
     for (const i of this.recArmed) {
       const t = this.song.tracks[i];
-      const g = Math.pow(10, t.trim / 20);
+      const g = Math.pow(10, (t.trim || 0) / 20);
       const oldLen = t.audio ? t.audio.length : 0;
       const end = Math.min(max, Math.max(oldLen, start + n - shift));
-      const a = new Float32Array(end); if (t.audio) a.set(t.audio.subarray(0, Math.min(oldLen, end)));
-      for (let k = shift; k < n; k++) { const w = start + k - shift; if (w >= 0 && w < end) a[w] = all[k] * g; }
-      t.audio = a;
+      if (t.input === '12') {
+        t.audio = put(t.audio, ch[0], end, g);
+        t.audioR = put(t.audioR || (oldLen ? t.audio.slice(0, oldLen) : null), ch[1], end, g);
+      } else {
+        const src = ch[t.input === '2' ? 1 : 0];
+        t.audio = put(t.audio, src, end, g);
+        if (t.audioR) t.audioR = put(t.audioR, src, end, g);
+      }
     }
     this.recChunks = [];
     this.changed('audio'); this.saveNow();
   }
   undoTake() {
     if (!this.undo || this.playing) return false;
-    for (const u of this.undo) { const t = this.song.tracks[u.i]; t.audio = u.audio; t.fi = u.fi || 0; t.fo = u.fo || 0; }
+    for (const u of this.undo) { const t = this.song.tracks[u.i]; t.audio = u.audio; t.audioR = u.audioR || null; t.fi = u.fi || 0; t.fo = u.fo || 0; }
     this.undo = null; this.changed('audio'); return true;
   }
-  clearTrack(i) { const t = this.song.tracks[i]; t.audio = null; t.fi = 0; t.fo = 0; t._undo = []; this.undo = null; this.changed('audio'); }
+  clearTrack(i) { const t = this.song.tracks[i]; t.audio = null; t.audioR = null; t.gain = 0; t.fi = 0; t.fo = 0; t._undo = []; this.undo = null; this.changed('audio'); }
 
   // ------------------------------------------------------------------ import
   async importFile(i, file) {
@@ -290,14 +333,13 @@ class Studio {
     const tail = end >= full - 0.01 && !raw ? 3 : 0;
     let channels;
     if (raw) {
-      const a = CZ.trackAudio(s.tracks[plan.track], sr);
-      channels = [a.slice(Math.round(start * sr), Math.round(end * sr))];
+      channels = CZ.trackChannels(s.tracks[plan.track], sr).map((a) => a.slice(Math.round(start * sr), Math.round(end * sr)));
     } else {
       const total = Math.ceil((end + tail) * sr);
       const off = new OfflineAudioContext(2, total, sr);
       await off.audioWorklet.addModule('worklets.js');
       const master = CZ.makeMaster(off, off.destination);
-      const anySolo = s.tracks.some((t) => t.solo);
+      const anySolo = s.tracks.some((t) => t.solo) || s.drums.ch.solo;
       const list = plan.track >= 0 ? [plan.track] : s.tracks.map((_, i) => i);
       let bus = master.input;
       if (plan.track >= 0) bus = off.destination;
@@ -306,14 +348,15 @@ class Studio {
         if (!t.audio) continue;
         const strip = CZ.makeStrip(off, bus);
         strip.apply(t, plan.track >= 0 ? true : (!t.mute && (!anySolo || t.solo)));
-        const audio = CZ.trackAudio(t, sr);
-        const b = off.createBuffer(1, audio.length, sr); b.getChannelData(0).set(audio);
+        const chs = CZ.trackChannels(t, sr);
+        const b = off.createBuffer(chs.length, chs[0].length, sr); chs.forEach((c, k) => b.getChannelData(k).set(c));
         const src = off.createBufferSource(); src.buffer = b; src.connect(strip.trim); src.start(0);
       }
       if (plan.track < 0) {
         master.apply(s, plan.mastering === false ? false : this.masterOn());
         if (s.drums.comp.length) {
-          const dg = off.createGain(); dg.gain.value = CZ.dbToGain(s.drums.vol); dg.connect(master.input);
+          const ds = CZ.makeStrip(off, master.input, 'drum'); ds.apply({ vol: s.drums.ch.vol, pan: s.drums.ch.pan, trim: 0, fx: s.drums.ch.fx }, !s.drums.ch.mute && (!anySolo || s.drums.ch.solo));
+          const dg = ds.trim;
           const bufs = CZ.drumBuffers(off).map((b, v) => this.customDrum(off, v) || b);
           const step = 60 / Math.max(30, s.bpm) / 4;
           let open = null;
@@ -323,7 +366,7 @@ class Studio {
             const n = CZ.patSteps(p), base = at0; at0 += n;
             for (let st = 0; st < n; st++) {
               const t = (base + st) * step; if (t >= end) return;
-              for (let v = 0; v < CZ.NDRUMS; v++) if (p.steps[v][st]) {
+              for (let v = 0; v < CZ.NDRUMS; v++) if (p.steps[v][st] && CZ.drumAudible(s.drums, v)) {
                 if (v === 2 && open) { try { open.stop(t); } catch (e) {} }
                 const src = CZ.hit(off, bufs[v], s.drums.knobs[v], dg, t);
                 if (v === 3) open = src;
@@ -343,7 +386,7 @@ class Studio {
     if (plan.channelsOnly) return { channels, sr };
     const blob = plan.format === 1 ? CZ.encodeMp3(channels, sr) : CZ.encodeWav(channels, sr);
     const clean = (x) => x.replace(/[^A-Za-z0-9 _-]/g, '_').trim() || 'Song';
-    let name = clean(s.name);
+    let name = clean(s.name);   // the file name
     if (plan.track >= 0) name += ' - ' + clean(s.tracks[plan.track].name) + (raw ? ' (raw)' : '');
     return { blob, name: name + (plan.format === 1 ? '.mp3' : '.wav') };
   }
@@ -401,37 +444,13 @@ class Studio {
     this.rangeEnd = { to, onEnd };
   }
 
-  // Drop In: count-in from 2 s before a, records only a..b (samples), calls done(take) with the new audio
-  async recordDropIn(i, a, b, done) {
-    await this.startAudio();
-    if (!(await this.openMic())) return 'nomic';
-    this.stopListen(); if (this.playing) this.stop();
-    const sr = this.sr;
-    this.pos = Math.max(0, a / sr - 2);
-    this.recChunks = []; this.recArmed = []; this.recPos = this.pos;
-    const t = this.song.tracks[i];
-    const orig = t.audio.slice(a, b);
-    this.drop = { i, a, b, done, orig };
-    const quiet = CZ.trackAudio(t, sr).slice(); quiet.fill(0, a, b);   // the old part is not heard while re-recording it
-    this.override = { i, audio: quiet };
-    this.dropMon = i; this.monitorGains[i].gain.value = 1;
-    const at = this.ctx.currentTime + 0.1;
-    this.recNode.port.postMessage({ rec: true, at });
-    this.startSegment(at, this.pos);
-    this.override = null;
-    this.playing = true; this.recording = true;
-    this.rangeEnd = { to: b / sr };
-    this.timer = setInterval(() => this.tick(), 25);
-    this.emit('transport');
-    return 'ok';
-  }
-
   // ------------------------------------------------------------------ songs, kept in the browser (IndexedDB)
   db() {
     if (this._db) return Promise.resolve(this._db);
     return new Promise((res, rej) => {
-      const r = indexedDB.open('conceptor', 2);
+      const r = indexedDB.open('conceptor', 3);
       r.onupgradeneeded = () => {
+        if (!r.result.objectStoreNames.contains('files')) r.result.createObjectStore('files', { keyPath: 'id' });
         if (!r.result.objectStoreNames.contains('songs')) r.result.createObjectStore('songs', { keyPath: 'name' });
         if (!r.result.objectStoreNames.contains('kv')) r.result.createObjectStore('kv');
       };
@@ -449,6 +468,28 @@ class Studio {
   kvGet(k) { return this.tx('readonly', (st) => st.get(k), 'kv'); }
   kvSet(k, v) { return this.tx('readwrite', (st) => st.put(v, k), 'kv'); }
   async allSongs() { return (await this.tx('readonly', (st) => st.getAll())) || []; }
+  // ------------------------------------------------------------------ Lt. Joe Bookman: imported files, drum samples, playlists
+  async addFile(cat, name, blob, len) {
+    const all = await this.allFiles();
+    const f = { id: 'f' + Date.now() + Math.random().toString(36).slice(2, 6), cat, name: CZ.uniqueName(name, all.filter((x) => x.cat === cat).map((x) => x.name)), blob, len, date: CZ.today() };
+    await this.tx('readwrite', (st) => st.put(f), 'files'); return f;
+  }
+  async allFiles() { return (await this.tx('readonly', (st) => st.getAll(), 'files')) || []; }
+  async getFile(id) { return this.tx('readonly', (st) => st.get(id), 'files'); }
+  async delFile(id) { await this.tx('readwrite', (st) => st.delete(id), 'files'); }
+  async playlists() { const r = await this.kvGet('playlists'); return Array.isArray(r) ? r : []; }
+  async setPlaylists(p) { await this.kvSet('playlists', p); }
+  // every exported mix and track, newest first: {e, song}
+  async allExports() {
+    if (this.song) await this.saveNow();
+    const out = []; for (const s of await this.allSongs()) for (const e of s.exports || []) out.push({ e, song: s.name });
+    return out.sort((a, b) => String(b.e.id).localeCompare(String(a.e.id)));
+  }
+  async deleteExport(songName, id) {
+    const song = this.song && this.song.name === songName ? this.song : await this.getSong(songName);
+    song.exports = song.exports.filter((e) => e.id !== id);
+    if (song === this.song) await this.saveNow(); else await this.tx('readwrite', (st) => st.put(song));
+  }
   async songNames() {
     const all = await this.allSongs();
     return all.sort((a, b) => (b.saved || 0) - (a.saved || 0)).map((x) => x.name);
@@ -456,12 +497,13 @@ class Studio {
   scheduleSave() { clearTimeout(this.saveTimer); this.saveTimer = setTimeout(() => this.saveNow(), 1500); }
   static fill(rec) {
     const song = Object.assign(CZ.newSong(rec.name), rec);
-    song.tracks.forEach((t) => { t.arm = false; t.fi = t.fi || 0; t.fo = t.fo || 0; if (t.audio && !(t.audio instanceof Float32Array)) t.audio = new Float32Array(t.audio); });
+    song.tracks.forEach((t) => { t.arm = false; t.fi = t.fi || 0; t.fo = t.fo || 0; if (t.audio && !(t.audio instanceof Float32Array)) t.audio = new Float32Array(t.audio); if (t.audioR && !(t.audioR instanceof Float32Array)) t.audioR = new Float32Array(t.audioR); });
     let longest = 0; for (const t of song.tracks) if (t.audio) longest = Math.max(longest, t.audio.length);
     CZ.migrateDrums(song, longest / (song.rate || 48000));
     if (!song.mode) song.mode = song.master && song.master.on ? 'polished' : 'demo';
     if (!song.exports) song.exports = [];
     if (!song.created) song.created = CZ.today();
+    CZ.migrate043(song, !rec.v043);
     return song;
   }
   async saveNow() {
@@ -539,7 +581,7 @@ class Studio {
     await this.startAudio();
     const sr = this.sr, n = chs[0].length, off = new OfflineAudioContext(2, n + Math.round(sr / 400), sr);
     await off.audioWorklet.addModule('worklets.js');
-    const m = CZ.makeMaster(off, off.destination); m.apply(this.song, true); m.vol.gain.value = 1;
+    const m = CZ.makeMaster(off, off.destination); m.apply(Object.assign({}, this.song, { masterVol: 0 }), true);
     const b = off.createBuffer(2, n, sr); chs.forEach((c, k) => b.getChannelData(k).set(c));
     const src = off.createBufferSource(); src.buffer = b; src.connect(m.input); src.start(0);
     const out = await off.startRendering(), la = Math.max(8, Math.round(sr / 500));
@@ -593,7 +635,7 @@ class Studio {
     const td = await dir.getDirectoryHandle('Tracks', { create: true });
     for (let i = 0; i < s.tracks.length; i++) {
       const t = s.tracks[i], file = String(i + 1).padStart(2, '0') + '.wav';
-      if (t.audio) await this.writeFile(td, file, CZ.encodeWav([t.audio], sr));
+      if (t.audio) await this.writeFile(td, file, CZ.encodeWav(t.audioR ? [t.audio, t.audioR] : [t.audio], sr));
       else { try { await td.removeEntry(file); } catch (e) {} }
     }
     const ds = s.drums.samples || [];
@@ -612,7 +654,8 @@ class Studio {
     const song = Studio.fill(meta);
     const readWav = async (d, n) => { try { const f = await (await d.getFileHandle(n)).getFile(); const b = await this.ctx.decodeAudioData(await f.arrayBuffer()); return b.getChannelData(0).slice(); } catch (e) { return null; } };
     let td = null; try { td = await dir.getDirectoryHandle('Tracks'); } catch (e) {}
-    for (let i = 0; i < song.tracks.length; i++) song.tracks[i].audio = td ? await readWav(td, String(i + 1).padStart(2, '0') + '.wav') : null;
+    const readWav2 = async (d, n) => { try { const f = await (await d.getFileHandle(n)).getFile(); const b = await this.ctx.decodeAudioData(await f.arrayBuffer()); return b.numberOfChannels > 1 ? [b.getChannelData(0).slice(), b.getChannelData(1).slice()] : [b.getChannelData(0).slice(), null]; } catch (e) { return [null, null]; } };
+    for (let i = 0; i < song.tracks.length; i++) { const [a, r] = td ? await readWav2(td, String(i + 1).padStart(2, '0') + '.wav') : [null, null]; song.tracks[i].audio = a; song.tracks[i].audioR = song.tracks[i].input === '12' ? r : null; }
     let dd = null; try { dd = await dir.getDirectoryHandle('Drum Sounds'); } catch (e) {}
     for (let v = 0; v < CZ.NDRUMS; v++) if (song.drums.samples[v]) { const a = dd ? await readWav(dd, v + '.wav') : null; song.drums.samples[v] = a ? Object.assign(song.drums.samples[v], { audio: a }) : null; }
     for (const e of song.exports) {

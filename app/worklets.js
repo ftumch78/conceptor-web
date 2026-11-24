@@ -77,11 +77,12 @@ class LimiterProcessor extends AudioWorkletProcessor {
 }
 registerProcessor('cz-limiter', LimiterProcessor);
 
-// Sends the microphone samples to the page while recording. Message {rec: true, at: contextTime} starts it.
+// Sends the input samples to the page while recording: channel 1 and channel 2 (Input 1 and Input 2).
+// Message {rec: true, at: contextTime} starts it; {rec: false} flushes and sends {done: true}.
 class RecorderProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.rec = false; this.at = 0; this.buf = []; this.size = 0;
+    this.rec = false; this.at = 0; this.buf = [[], []]; this.size = 0;
     this.port.onmessage = (e) => {
       if (e.data.rec) { this.rec = true; this.at = e.data.at; }
       else { this.flush(); this.rec = false; this.port.postMessage({ done: true }); }
@@ -89,29 +90,22 @@ class RecorderProcessor extends AudioWorkletProcessor {
   }
   flush() {
     if (!this.size) return;
-    const a = new Float32Array(this.size); let o = 0;
-    for (const b of this.buf) { a.set(b, o); o += b.length; }
-    this.port.postMessage({ data: a, }, [a.buffer]);
-    this.buf = []; this.size = 0;
+    const out = [0, 1].map((c) => { const a = new Float32Array(this.size); let o = 0; for (const b of this.buf[c]) { a.set(b, o); o += b.length; } return a; });
+    this.port.postMessage({ data: out }, [out[0].buffer, out[1].buffer]);
+    this.buf = [[], []]; this.size = 0;
   }
   process(inputs) {
     const inp = inputs[0];
     if (!this.rec || !inp || !inp[0]) return true;
-    const n = inp[0].length;
-    const t0 = currentTime;
+    const n = inp[0].length, t0 = currentTime;
     let start = 0;
-    if (t0 < this.at) {
-      const skip = Math.round((this.at - t0) * sampleRate);
-      if (skip >= n) return true;
-      start = skip;
+    if (t0 < this.at) { const skip = Math.round((this.at - t0) * sampleRate); if (skip >= n) return true; start = skip; }
+    for (let c = 0; c < 2; c++) {
+      const src = inp[c] || null, a = new Float32Array(n - start);
+      if (src) a.set(src.subarray(start));
+      this.buf[c].push(a);
     }
-    const c = new Float32Array(n - start);
-    for (let i = start; i < n; i++) {
-      let s = 0; for (let k = 0; k < inp.length; k++) s += inp[k][i];
-      c[i - start] = s / inp.length;
-    }
-    if (this.size === 0 && start === 0 && t0 > this.at) this.port.postMessage({ lateBy: t0 - this.at });
-    this.buf.push(c); this.size += c.length;
+    this.size += n - start;
     if (this.size >= sampleRate / 4) this.flush();
     return true;
   }

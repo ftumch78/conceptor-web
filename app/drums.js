@@ -1,214 +1,192 @@
-// Conceptor 0.4.1 drum programmer "Gillian and Stephen": pattern cards on top, the Pattern Compile row directly under them,
-// and the editor for the selected pattern below that. Birthing Unit colours: pattern colour only on borders and names;
-// hits in the Birthing Unit drum lane colours at 75%.
+// Conceptor 0.4.3 drum programmer "Gillian and Stephen". Landscape: the pattern cards and the Pattern Compile row across the top,
+// the grid with all 4 bars below. Each drum row: name, Import, M, S, then the squares.
 'use strict';
 
-const DP = { selBlk: -1, selSnd: 0, stripScroll: 0, compScroll: 0, drag: null, half: 0 };
-const SLOT = 61;   // width of one block in the row, in pixels
-const SC = () => CZ.LANECOL;
+const DP = { selBlk: -1, selSnd: 0, drag: null };
+const SLOT = 55;   // width of one block in the row
+const LC = () => CZ.LANECOL;
 
 function miniGrid(cv, p, w, h) {
   const dpr = 2; cv.width = w * dpr; cv.height = h * dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr);
-  g.fillStyle = '#1C1D20'; g.fillRect(0, 0, w, h);
-  const n = CZ.patSteps(p), cw = w / n, ch = h / CZ.NDRUMS, sc = SC();
-  for (let r = 0; r < CZ.NDRUMS; r++) for (let c = 0; c < n; c++) {
-    g.fillStyle = p.steps[r][c] ? sc[r] + 'BF' : ((c >> 2) % 2 ? '#202226' : '#2b2d32');
-    g.fillRect(c * cw + 0.4, r * ch + 0.4, cw - 0.8, ch - 0.8);
-  }
-}
-// Birthing Unit knob: dark body, ring, lavender pointer
-function knobSVG(v) {
-  const a = (-135 + v * 2.7) * Math.PI / 180, x = 16 + 11 * Math.sin(a), y = 16 - 11 * Math.cos(a);
-  return `<svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="#2E2F34" stroke="#484A51" stroke-width="1.5"/><line x1="${(16 + 4 * Math.sin(a)).toFixed(1)}" y1="${(16 - 4 * Math.cos(a)).toFixed(1)}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#B9AAE0" stroke-width="2.4" stroke-linecap="round"/></svg>`;
+  g.fillStyle = '#1C1D21'; g.fillRect(0, 0, w, h);
+  const n = CZ.patSteps(p), cw = w / n, chh = h / CZ.NDRUMS, sc = LC();
+  for (let r = 0; r < CZ.NDRUMS; r++) for (let c = 0; c < n; c++) { g.fillStyle = p.steps[r][c] ? sc[r] + 'BF' : ((c >> 2) % 2 ? '#202226' : '#2b2d32'); g.fillRect(c * cw + 0.4, r * chh + 0.4, cw - 0.8, chh - 0.8); }
 }
 const mmss = (s) => Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
 
-function drumScreen() {
-  const s = S.song, d = s.drums, p = CZ.selPattern(s), ph = CZ.placeholder(s), sc = SC();
+screens.drums = () => {
+  const s = song(), d = s.drums, p = CZ.selPattern(s), n = CZ.patSteps(p), ph = CZ.placeholder(s), sc = LC();
   if (DP.selBlk >= d.comp.length) DP.selBlk = -1;
-  if (p.bars !== 4) DP.half = 0;
-  const off = DP.half * 8;
-  const smp = d.samples[DP.selSnd];
-  const prev = S.previewPat === p.id;
-  let h = topBack('GILLIAN AND STEPHEN', 'drums') + `<div class="scroll dp">
-    <div class="section">PATTERN EDIT ${ii('patternedit')}<span class="hint">Tap to edit. Drag down to add.</span></div>
-    <div class="strip2" id="strip">${d.patterns.map((x) => `<div class="pcard ${x.id === p.id ? 'sel' : ''}" data-p="${x.id}" style="border-color:${x.color};color:${x.color}">
-        <div class="ch"><span>${esc(x.name)}</span><button class="dots" data-pmenu="${x.id}" aria-label="Pattern options">&#8943;</button></div><canvas></canvas>
-        <div class="phk ${x.ph ? 'on' : ''}" data-ph="${x.id}" role="checkbox" aria-checked="${x.ph}"><i>${x.ph ? '&#10003;' : ''}</i>Placeholder${x.id === p.id ? ii('ph') : ''}</div>
-        ${x.ph ? `<div class="sl2">Song length<br><input id="phm" value="${Math.floor(d.phLen / 60)}" inputmode="numeric" aria-label="Minutes">:<input id="phs" value="${String(d.phLen % 60).padStart(2, '0')}" inputmode="numeric" aria-label="Seconds"> = ${CZ.phBars(s)} blocks</div>` : ''}</div>`).join('')}
-      <button class="pcard add" data-act="dp-new"><b>+</b>New pattern</button></div>
-    <div class="section ctitle">PATTERN COMPILE ${ii('comp')}<span class="hint">${d.comp.length} blocks · ${mmss(CZ.rowSec(s))}${ph ? ` · fills to ${mmss(d.phLen)}` : ''}</span></div>
-    <div class="comp" id="comp"><div class="ruler" style="width:${d.comp.length * SLOT + 12}px">${d.comp.map((b, i) => `<span style="left:${i * SLOT}px">${i + 1}</span>`).join('')}</div>
-      <div class="track" id="ctrack">${d.comp.map((b, i) => { const q = CZ.pat(d, b.p) || p; return `<div class="blk ${b.ph ? 'ph' : ''} ${i === DP.selBlk ? 'sel' : ''} ${S.playing && S.drumBlock === i ? 'play' : ''}" data-i="${i}" style="border-color:${q.color}"><canvas></canvas><div class="bn" style="color:${q.color}">${b.ph ? 'Placeholder' : esc(q.name.replace(/^Pattern /, 'Pat '))}</div></div>`; }).join('')}</div>
-      <div class="marker" id="marker"></div>${d.comp.length ? '' : '<div class="empty">Empty. Drag patterns here, or use Add to row.</div>'}</div>
-    <div class="chead">${hx('Repeat', 'dp-repeat', '', DP.selBlk < 0 ? 'disabled' : '')}${hx('Remove', 'dp-remove', '', DP.selBlk < 0 ? 'disabled' : '')}${hx('Clear row', 'dp-clearrow')}</div>
-    <div class="epanel"><div class="prow"><span class="pname" data-act="dp-rename" style="color:${p.color}">${esc(p.name)}</span>
-      ${hx(prev ? '&#9632;&#xFE0E;' : '&#9654;&#xFE0E;', 'dp-play', 'r gplay ' + (prev ? 'on' : ''), 'aria-label="Play pattern"')}${hx('Add to row', 'dp-addrow')}${hx('Clear pattern', 'dp-clearpat')}</div>
-    <div class="brow">Number of bars ${hx('2', 'dp-bars-2', 'r ' + (p.bars === 2 ? 'yel' : ''), 'aria-pressed="' + (p.bars === 2) + '"')}${hx('4', 'dp-bars-4', 'r ' + (p.bars !== 2 ? 'yel' : ''), 'aria-pressed="' + (p.bars !== 2) + '"')}${ii('bars')}
-      <button class="sw2 ${p.bars === 2 ? 'off' : ''}" data-act="dp-half" ${p.bars === 2 ? 'disabled' : ''} aria-label="Show bars 1 and 2, or bars 3 and 4">Bars 1 &amp; 2 <span class="toggle ${DP.half ? 'on' : ''}"><i></i></span> Bars 3 &amp; 4</button></div>
-    <div class="dgrid8"><span></span><span class="ghead" style="grid-column:span 4">Bar ${off / 4 + 1}</span><span class="ghead" style="grid-column:span 4">Bar ${off / 4 + 2}</span>`;
-  for (let r = 0; r < CZ.NDRUMS; r++) {
-    h += `<button class="snd ${r === DP.selSnd ? 'sel' : ''}" data-act="dp-snd-${r}">${CZ.DRUMS[r]}</button>`;
-    for (let k = 0; k < 8; k++) { const c = off + k; h += `<span class="c ${(c >> 2) % 2 ? 'alt' : ''}" data-step="${c}" data-act="dp-cell-${r}-${c}" style="${p.steps[r][c] ? `background:${sc[r]}BF;border-color:${sc[r]}` : ''}" role="checkbox" aria-checked="${p.steps[r][c]}" aria-label="${CZ.DRUMS[r]} bar ${(c >> 2) + 1} square ${(c % 4) + 1}"></span>`; }
-  }
-  h += `</div>
-    <div class="knobs"><span class="kl">${CZ.DRUMS[DP.selSnd]}<small>${smp ? esc(smp.name) : 'Built-in'}</small></span>${CZ.KNOBS.map((k, i) => `<div class="kn" data-k="${i}" role="slider" aria-label="${k}" aria-valuenow="${d.knobs[DP.selSnd][i]}">${knobSVG(d.knobs[DP.selSnd][i])}${k}</div>`).join('')}${ii('knobs')}</div>
-    <div class="sndb">${hx('&#9654;&#xFE0E; Listen', 'dp-listen')}${hx('Import Audio', 'dp-import')}${hx('Edit Sound', 'dp-editsnd', '', smp ? '' : 'disabled')}${hx('Reset Sound', 'dp-resetsnd', '', smp ? '' : 'disabled')}${ii('drumsound')}</div></div>
-  </div>`;
-  return h + transport();
-}
-
-function drumsAfter() {
-  const d = S.song.drums;
-  document.querySelectorAll('#strip .pcard[data-p]').forEach((el) => { miniGrid(el.querySelector('canvas'), CZ.pat(d, +el.dataset.p), 108, 52); attachCardDrag(el); });
-  document.querySelectorAll('#ctrack .blk').forEach((el) => { const b = d.comp[+el.dataset.i]; miniGrid(el.querySelector('canvas'), CZ.pat(d, b.p) || d.patterns[0], 49, 30); attachBlockDrag(el); });
-  document.querySelectorAll('.kn').forEach(attachKnob);
-  const strip = $('#strip'), comp = $('#comp');
-  strip.scrollLeft = DP.stripScroll; comp.scrollLeft = DP.compScroll;
-  strip.onscroll = () => { DP.stripScroll = strip.scrollLeft; };
-  comp.onscroll = () => { DP.compScroll = comp.scrollLeft; };
-  ['#phm', '#phs'].forEach((q) => { const e = $(q); if (e) e.onchange = setPhLen; });
-}
+  const anySolo = d.ms.some((x) => x.s), prev = S.previewPat === p.id, smp = d.samples[DP.selSnd];
+  let h = `<div class="scroll" data-keep="drums">
+    <div class="lab">PATTERN EDIT ${ii('patternedit')}<span class="sp"></span><span style="letter-spacing:0">Tap to edit. Drag down to add. Tap ⋯ to rename, duplicate or delete.</span></div>
+    <div class="cards" id="cards" data-keep="cards">${d.patterns.map((x) => `<div class="card ${x.id === p.id ? 'sel' : ''}" data-p="${x.id}" style="border-color:${x.color};color:${x.color}">
+      <div class="ch"><span>${esc(x.name)}</span><span class="row" style="gap:2px"><span style="color:var(--dim);font-weight:normal">${x.bars}b</span><button class="b s r" data-pmenu="${x.id}" data-n="Pattern options: rename, duplicate, delete">&#8943;</button></span></div><canvas></canvas>
+      <div class="phk ${x.ph ? 'on' : ''}" data-ph="${x.id}" data-n="Placeholder: fill the whole song row with this pattern"><i>${x.ph ? '&#10003;' : ''}</i>Placeholder${x.id === p.id ? ii('ph') : ''}</div>
+      ${x.ph ? `<div class="dim" style="font-size:9px;margin-top:2px">Song length <input id="phm" class="text" style="width:30px;padding:1px 3px;font-size:10px;display:inline" value="${Math.floor(d.phLen / 60)}" inputmode="numeric" aria-label="Minutes">:<input id="phs" class="text" style="width:30px;padding:1px 3px;font-size:10px;display:inline" value="${String(d.phLen % 60).padStart(2, '0')}" inputmode="numeric" aria-label="Seconds"></div>` : ''}</div>`).join('')}
+      <div class="card add" onclick="dpNew()" data-n="New pattern"><b style="font-size:16px">+</b>New pattern</div></div>
+    <div class="lab">PATTERN COMPILE ${ii('comp')}<span class="sp"></span><span style="letter-spacing:0">${plural(d.comp.length, 'block')} · ${mmss(CZ.rowSec(s))}${ph ? ` · fills to ${mmss(d.phLen)}` : ''}</span>${B('Repeat', 'dpRepeat()', 's', DP.selBlk < 0 ? 'disabled' : 'data-n="Repeat the selected block"')}${B('Remove', 'dpRemove()', 's', DP.selBlk < 0 ? 'disabled' : 'data-n="Remove the selected block"')}${B('Clear row', 'dpClearRow()', 's', 'data-n="Remove every block from the row"')}</div>
+    <div class="comp" id="comp" data-keep="comp"><div class="trk" id="ctrack">${d.comp.map((b, i) => { const q = CZ.pat(d, b.p) || p; return `<div class="blk ${b.ph ? 'ph' : ''} ${i === DP.selBlk ? 'sel' : ''} ${S.playing && !S.previewPat && S.drumBlock === i ? 'play' : ''}" data-i="${i}" style="border-color:${q.color}"><canvas></canvas><div class="bn" style="color:${q.color}">${b.ph ? 'Placeholder' : esc(q.name.replace(/^Pattern /, 'Pat '))}</div></div>`; }).join('')}${d.comp.length ? '' : '<span class="dim" style="padding:14px">Empty. Drag patterns here, or use Add to row.</span>'}</div><div class="marker" id="marker"></div></div>
+    <div class="row" style="margin:2px 0 5px;flex-wrap:wrap"><b style="color:${p.color};font-size:12px;cursor:pointer" onclick="renamePattern(${p.id})" data-n="Pattern name: tap to rename">${esc(p.name)}</b>${B(prev ? STOPI : PLAYI, 'dpPlay()', 's r gplay ' + (prev ? 'on' : ''), 'data-n="Play this pattern again and again"')}${B('Add to row', 'dpAddRow()', 's', 'data-n="Add this pattern to the end of the row"')}${B('Clear pattern', 'dpClearPat()', 's', 'data-n="Remove every hit from this pattern"')}
+      <span class="dim">Number of bars</span>${B('2', 'dpBars(2)', 's r ' + (p.bars === 2 ? 'yel' : ''), 'data-n="2 bars"')}${B('4', 'dpBars(4)', 's r ' + (p.bars !== 2 ? 'yel' : ''), 'data-n="4 bars"')}${ii('bars')}<span class="dim">All bars showing</span>${ii('drumms')}</div>
+    <div class="dgrid" style="grid-template-columns:76px 22px 22px 22px repeat(${n},1fr)"><span></span><span class="dim" style="font-size:8px;text-align:center">Imp</span><span class="dim" style="font-size:8px;text-align:center">M</span><span class="dim" style="font-size:8px;text-align:center">S</span>${Array.from({ length: n / 4 }, (_, b) => `<span class="bh" style="grid-column:span 4">Bar ${b + 1}</span>`).join('')}`;
+  CZ.DRUMS.forEach((nm, r) => {
+    const silent = d.ms[r].m || (anySolo && !d.ms[r].s), sm = d.samples[r];
+    h += `<div class="snd ${r === DP.selSnd ? 'sel' : ''}" onclick="DP.selSnd=${r};render()" data-n="${nm}: ${esc(sm ? sm.name : 'Built-in')}">${nm}</div>${B(IMPI, `openSamples(${r})`, 's r', `data-n="Import a sound for ${nm} from the drum samples library"`)}${B('M', `dpMS(${r},'m')`, 's r ' + (d.ms[r].m ? 'on' : ''), `data-n="Mute ${nm}"`)}${B('S', `dpMS(${r},'s')`, 's r ' + (d.ms[r].s ? 'yel' : ''), `data-n="Solo ${nm}"`)}`;
+    for (let c = 0; c < n; c++) h += `<div class="c ${(c >> 2) % 2 ? 'alt' : ''} ${silent ? 'mut' : ''}" data-step="${c}" style="${p.steps[r][c] ? `background:${sc[r]}BF;border-color:${sc[r]}` : ''}" onclick="dpCell(${r},${c})" role="checkbox" aria-checked="${p.steps[r][c]}" aria-label="${nm} bar ${(c >> 2) + 1} square ${(c % 4) + 1}"></div>`;
+  });
+  h += `</div><div class="row" style="margin-top:6px;gap:12px;flex-wrap:wrap"><span style="width:130px;font-size:11px">${CZ.DRUMS[DP.selSnd]}<br><small class="dim">${esc(smp ? smp.name : 'Built-in')}</small></span>
+    ${CZ.KNOBS.map((k, j) => knob(`dk${DP.selSnd}_${j}`, k, () => d.knobs[DP.selSnd][j], (v) => { d.knobs[DP.selSnd][j] = v; S.changed('knob'); }, 30)).join('')}${ii('knobs')}
+    ${B(PLAYI + ' Listen', 'dpListen()', 's', 'data-n="Listen to this drum sound"')}${B('Reset Sound', 'dpReset()', 's', (smp ? '' : 'disabled ') + 'data-n="Back to the built-in sound"')}</div></div>`;
+  return h;
+};
+after.drums = () => {
+  const d = song().drums;
+  document.querySelectorAll('#cards .card[data-p]').forEach((el) => { miniGrid(el.querySelector('canvas'), CZ.pat(d, +el.dataset.p), 100, 38); attachCardDrag(el); });
+  document.querySelectorAll('#ctrack .blk').forEach((el) => { const b = d.comp[+el.dataset.i]; miniGrid(el.querySelector('canvas'), CZ.pat(d, b.p) || d.patterns[0], 44, 26); attachBlockDrag(el); });
+  wireControls();
+  ['phm', 'phs'].forEach((q) => { const e = $(q); if (e) { e.onchange = setPhLen; e.onpointerdown = (ev) => ev.stopPropagation(); } });
+};
 function drumLive() {
-  if (ui.screen !== 3) return;
-  const previewing = !!S.previewPat, p = CZ.selPattern(S.song);
-  // while a 4-bar pattern plays, the grid shows the half that is playing
-  if (previewing && S.previewPat === p.id && p.bars === 4 && S.drumStep >= 0 && (S.drumStep >> 3) !== DP.half) { DP.half = S.drumStep >> 3; render(); return; }
-  document.querySelectorAll('.dgrid8 .c').forEach((c) => c.classList.toggle('now', previewing && +c.dataset.step === S.drumStep));
+  if (ui.screen !== 'drums') return;
+  const previewing = !!S.previewPat;
+  document.querySelectorAll('.dgrid .c').forEach((c) => c.classList.toggle('now', previewing && +c.dataset.step === S.drumStep));
   document.querySelectorAll('#ctrack .blk').forEach((b) => b.classList.toggle('play', S.playing && !previewing && +b.dataset.i === S.drumBlock));
 }
-S.on((what) => { if (what === 'block' && ui.screen === 3 && S.drumBlock >= 0) { const c = $('#comp'); if (c) { c.scrollLeft = Math.max(0, S.drumBlock * SLOT - 120); } } });
+S.on((what) => { if (what === 'block' && ui.screen === 'drums' && S.drumBlock >= 0 && !S.previewPat) { const c = $('comp'); if (c) c.scrollLeft = Math.max(0, S.drumBlock * SLOT - 120); } });
 
 // ------------------------------------------------------------------ actions
+const dch = () => { S.changed('drums'); render(); };
+function dpCell(r, c) { const p = CZ.selPattern(song()); p.steps[r][c] = !p.steps[r][c]; dch(); }
+function dpMS(r, k) { const x = song().drums.ms[r]; x[k] = !x[k]; dch(); }
+function dpNew() { const d = song().drums, n = CZ.newPattern(d); d.sel = n.id; KEEP.cards = [99999, 0]; dch(); toast(n.name + ' added.'); }
+async function dpPlay() { const p = CZ.selPattern(song()); if (S.previewPat) S.stop(); else await S.previewPattern(p.id); render(); }
+function firstPh() { const i = song().drums.comp.findIndex((b) => b.ph); return i < 0 ? song().drums.comp.length : i; }
+function dpAddRow() { const s = song(), p = CZ.selPattern(s); s.drums.comp.splice(firstPh(), 0, { p: p.id }); CZ.trimPh(s); dch(); toast(p.name + ' added to the row.'); }
+function dpClearPat() { CZ.selPattern(song()).steps = CZ.emptySteps(); dch(); }
+function dpBars(b) { const s = song(), p = CZ.selPattern(s); p.bars = b; CZ.fillPh(s); dch(); toast(`${p.name}: ${b} bars.`); }
+async function dpListen() { await S.startAudio(); S.stopListen(); S.playDrum(DP.selSnd, S.ctx.currentTime + 0.02, S.ctx.destination); }
+function dpReset() { S.resetDrumSample(DP.selSnd); render(); toast('Built-in sound restored.'); }
+function dpRepeat() { const s = song(), d = s.drums; if (DP.selBlk < 0) return; d.comp.splice(DP.selBlk + 1, 0, { p: d.comp[DP.selBlk].p }); DP.selBlk++; CZ.trimPh(s); dch(); toast('Repeated.'); }
+function dpRemove() { const s = song(), d = s.drums; if (DP.selBlk < 0) return; d.comp.splice(DP.selBlk, 1); DP.selBlk = -1; CZ.fillPh(s); dch(); toast('Removed.'); }
+function dpClearRow() { const d = song().drums; step({ title: 'Clear the row?', text: 'Removes every block from the song row. The patterns stay.', opts: [['Clear row', () => { d.comp = []; DP.selBlk = -1; d.patterns.forEach((x) => { x.ph = false; }); closeBox(); dch(); }, 'red']] }); }
 function setPhLen() {
-  const s = S.song, m = Math.max(0, Math.min(20, parseInt($('#phm').value, 10) || 0)), sec = Math.max(0, Math.min(59, parseInt($('#phs').value, 10) || 0));
-  s.drums.phLen = Math.max(10, m * 60 + sec); CZ.fillPh(s); DP.selBlk = -1; S.changed('drums'); render();
+  const s = song(), m = clamp(parseInt($('phm').value, 10) || 0, 0, 20), sec = clamp(parseInt($('phs').value, 10) || 0, 0, 59);
+  s.drums.phLen = Math.max(10, m * 60 + sec); CZ.fillPh(s); DP.selBlk = -1; dch();
 }
 function togglePh(id) {
-  const s = S.song, p = CZ.pat(s.drums, id);
-  if (p.ph) { p.ph = false; CZ.fillPh(s); DP.selBlk = -1; S.changed('drums'); render(); say('Placeholder removed from the row.'); return; }
+  const s = song(), p = CZ.pat(s.drums, id);
+  if (p.ph) { p.ph = false; CZ.fillPh(s); DP.selBlk = -1; dch(); toast('Placeholder removed from the row.'); return; }
   s.drums.patterns.forEach((x) => { x.ph = false; });
-  p.ph = true; CZ.fillPh(s); DP.selBlk = -1; S.changed('drums'); render();
-  say(`${p.name} fills the row: ${mmss(s.drums.phLen)}, ${CZ.phBars(s)} blocks.`);
+  p.ph = true; CZ.fillPh(s); DP.selBlk = -1; dch();
+  toast(`${p.name} fills the row: ${mmss(s.drums.phLen)}, ${CZ.phBars(s)} blocks.`);
 }
-function firstPh() { const i = S.song.drums.comp.findIndex((b) => b.ph); return i < 0 ? S.song.drums.comp.length : i; }
 function patMenu(id) {
-  const s = S.song, d = s.drums, p = CZ.pat(d, id); d.sel = id;
-  step({ title: p.name, opts: [
+  const s = song(), d = s.drums, p = CZ.pat(d, id); d.sel = id;
+  step({ title: p.name, tip: 'patternedit', opts: [
     ['Rename', () => renamePattern(id)],
-    ['Duplicate', () => { const n = CZ.newPattern(d, p.steps.map((r) => r.slice())); n.bars = p.bars; n.name = CZ.uniqueName(p.name + ' copy', d.patterns.map((x) => x.name)); d.sel = n.id; closeBox(); S.changed('drums'); render(); say('Duplicated.'); }],
+    ['Duplicate', () => { const n = CZ.newPattern(d, p.steps.map((r) => r.slice())); n.bars = p.bars; n.name = CZ.uniqueName(p.name + ' copy', d.patterns.map((x) => x.name)); d.sel = n.id; closeBox(); dch(); toast('Duplicated.'); }],
     ['Delete', () => {
       if (d.patterns.length === 1) { message('Delete', 'One pattern must stay.'); return; }
       const used = d.comp.filter((b) => b.p === id).length;
       step({ title: 'Delete ' + p.name + '?', text: used ? `It is used ${used} times in the song row. Those blocks are removed too.` : 'This cannot be undone.',
-        opts: [['Delete', () => { d.comp = d.comp.filter((b) => b.p !== id); d.patterns.splice(d.patterns.indexOf(p), 1); d.sel = d.patterns[0].id; DP.selBlk = -1; closeBox(); S.changed('drums'); render(); say('Pattern deleted.'); }, 'red']] });
+        opts: [['Delete', () => { d.comp = d.comp.filter((b) => b.p !== id); d.patterns.splice(d.patterns.indexOf(p), 1); d.sel = d.patterns[0].id; DP.selBlk = -1; closeBox(); dch(); toast('Pattern deleted.'); }, 'red']] });
     }, 'red']] });
 }
 function renamePattern(id) {
-  const p = CZ.pat(S.song.drums, id);
-  step({ title: 'Rename pattern', html: `<input id="rn" class="text" value="${esc(p.name)}">`, opts: [['Save', () => { p.name = $('#rn').value.trim() || 'Pattern ' + p.id; closeBox(); S.changed('drums'); render(); }]] });
-  setTimeout(() => $('#rn') && $('#rn').select(), 30);
-}
-async function drumAct(a) {
-  const s = S.song, d = s.drums, p = CZ.selPattern(s);
-  let r;
-  if (a === 'dp-new') { const n = CZ.newPattern(d); d.sel = n.id; DP.stripScroll = 99999; S.changed('drums'); render(); say(n.name + ' added.'); }
-  else if (a === 'dp-rename') renamePattern(p.id);
-  else if (a === 'dp-play') { if (S.previewPat) S.stop(); else await S.previewPattern(p.id); render(); }
-  else if (a === 'dp-addrow') { d.comp.splice(firstPh(), 0, { p: p.id }); CZ.trimPh(s); S.changed('drums'); render(); say(p.name + ' added to the row.'); }
-  else if (a === 'dp-clearpat') { p.steps = CZ.emptySteps(); S.changed('drums'); render(); }
-  else if ((r = a.match(/^dp-snd-(\d+)$/))) { DP.selSnd = +r[1]; render(); }
-  else if ((r = a.match(/^dp-bars-(2|4)$/))) { p.bars = +r[1]; if (p.bars === 2) DP.half = 0; CZ.fillPh(s); S.changed('drums'); render(); say(`${p.name}: ${p.bars} bars.`); }
-  else if (a === 'dp-half') { if (p.bars === 4) { DP.half = DP.half ? 0 : 1; render(); } }
-  else if ((r = a.match(/^dp-cell-(\d+)-(\d+)$/))) { p.steps[+r[1]][+r[2]] = !p.steps[+r[1]][+r[2]]; S.changed('drums'); render(); }
-  else if (a === 'dp-listen') { await S.startAudio(); S.stopListen(); S.playDrum(DP.selSnd, S.ctx.currentTime + 0.02, S.ctx.destination); }
-  else if (a === 'dp-import') drumImport(DP.selSnd, null, false);
-  else if (a === 'dp-editsnd') openDed(DP.selSnd);
-  else if (a === 'dp-resetsnd') { S.resetDrumSample(DP.selSnd); render(); say('Built-in sound restored.'); }
-  else if (a === 'dp-repeat') { if (DP.selBlk < 0) return; d.comp.splice(DP.selBlk + 1, 0, { p: d.comp[DP.selBlk].p }); DP.selBlk++; CZ.trimPh(s); S.changed('drums'); render(); say('Repeated.'); }
-  else if (a === 'dp-remove') { if (DP.selBlk < 0) return; d.comp.splice(DP.selBlk, 1); DP.selBlk = -1; CZ.fillPh(s); S.changed('drums'); render(); say('Removed.'); }
-  else if (a === 'dp-clearrow') step({ title: 'Clear the row?', text: 'Removes every block from the song row. The patterns stay.', opts: [['Clear row', () => { d.comp = []; DP.selBlk = -1; d.patterns.forEach((x) => { x.ph = false; }); closeBox(); S.changed('drums'); render(); }, 'red']] });
+  const p = CZ.pat(song().drums, id);
+  step({ title: 'Rename pattern', html: `<input id="rn" class="text" value="${esc(p.name)}">`, opts: [['Save', () => { p.name = $('rn').value.trim() || 'Pattern ' + p.id; closeBox(); dch(); }]] });
+  setTimeout(() => $('rn') && $('rn').select(), 30);
 }
 
-// ------------------------------------------------------------------ knobs: drag up or down
-function attachKnob(el) {
-  el.addEventListener('pointerdown', (e) => {
-    e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch (x) {}
-    const k = +el.dataset.k, v = DP.selSnd, kn = S.song.drums.knobs[v], y0 = e.clientY, v0 = kn[k];
-    const mv = (ev) => { kn[k] = Math.max(0, Math.min(100, Math.round(v0 + (y0 - ev.clientY) * 0.8))); el.querySelector('svg').outerHTML = knobSVG(kn[k]); el.setAttribute('aria-valuenow', kn[k]); };
-    const up = () => { el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); S.changed('knob'); say(`${CZ.DRUMS[v]} ${CZ.KNOBS[k]}: ${kn[k]}`); };
-    el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
-  });
-  el.addEventListener('keydown', (e) => { const kn = S.song.drums.knobs[DP.selSnd], k = +el.dataset.k; if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { kn[k] = Math.max(0, Math.min(100, kn[k] + (e.key === 'ArrowUp' ? 2 : -2))); S.changed('knob'); render(); } });
-  el.tabIndex = 0;
+// ------------------------------------------------------------------ J5: drum samples from the library
+let SAMP = { r: 0, cat: 'Kicks' };
+function openSamples(r) {
+  SAMP = { r, cat: CZ.SAMPLE_FOLDER[r] };
+  libRefresh().then(() => openPop(`DRUM SAMPLES · ${CZ.DRUMS[r].toUpperCase()}`, samplesBody, { tip: 'samples', onClose: () => S.stopListen() }));
+}
+function samplesBody() {
+  const r = SAMP.r, list = drumSampleList(SAMP.cat), cur = song().drums.samples[r];
+  return `<div class="row" style="margin-bottom:6px">${BOOK(18)}<span class="dim">From Lt. Joe Bookman · Drum samples</span><span class="sp"></span>${B('From device…', `sampFromDevice(${r})`, 's', 'data-n="Pick a file on this device. It is added to the library first."')}${B('Reset Sound', `S.resetDrumSample(${r});drawPop();toast('Built-in sound restored.')`, 's', (cur ? '' : 'disabled ') + 'data-n="Back to the built-in sound"')}</div>
+    <div class="split" style="min-height:220px;border:1px solid var(--line);border-radius:8px;overflow:hidden"><div class="cats" data-keep="sampcats">${CZ.SAMPLE_CATS.map((c) => `<div class="cat ${c === SAMP.cat ? 'sel' : ''}" onclick="SAMP.cat='${c}';drawPop()">${c}<small>${drumSampleList(c).length}</small></div>`).join('')}</div>
+    <div class="files" data-keep="sampfiles">${list.map((f, k) => `<div class="file ${cur && cur.name === f.name ? 'sel' : ''}"><span class="fn">${esc(f.name)}<small>${SAMP.cat}${f.len ? ' · ' + f.len.toFixed(2) + ' s' : ''}</small></span>${B(PLAYI + ' Listen', `sampListen(${k})`, 's gplay', 'data-n="Listen to this sample"')}${B('Use', `sampUse(${k})`, 's on', `data-n="Use this sample for ${CZ.DRUMS[r]}"`)}</div>`).join('') || '<p class="dim">Nothing here yet. Use From device… to add a file.</p>'}</div></div>`;
+}
+async function sampAudio(f) { await S.startAudio(); return f.builtin != null ? CZ.sampleAudio(CZ.SAMPLES[f.builtin][2], S.sr) : await S.decodeFile(f.blob, 4); }
+async function sampListen(k) { const f = drumSampleList(SAMP.cat)[k], a = await sampAudio(f); if (a) S.listen([a]); else toast('That file could not be read.'); }
+async function sampUse(k) {
+  const f = drumSampleList(SAMP.cat)[k], a = await sampAudio(f); if (!a) { toast('That file could not be read.'); return; }
+  S.stopListen(); S.setDrumSample(SAMP.r, a.slice(), f.name); closePop(); toast(`${f.name} is now the ${CZ.DRUMS[SAMP.r]} sound.`);
+}
+function sampFromDevice(r) {
+  pickFile(async (files) => {
+    let last = null;
+    for (const file of files) { const a = await S.decodeFile(file, 4); if (!a) { toast(file.name + ' could not be read.'); continue; } last = await S.addFile('drum', file.name, file, a.length / S.sr); }
+    await libRefresh(); SAMP.cat = 'Imported'; drawPop(); if (last) toast(last.name + ' added to the library. Tap Use.');
+  }, true);
 }
 
 // ------------------------------------------------------------------ dragging: cards down into the row, blocks along it or out of it
 function makeGhost(p) {
   const g = document.createElement('div'); g.className = 'ghost';
-  g.style.borderColor = p.color; g.innerHTML = `<canvas></canvas><div class="gn" style="color:${p.color}">${esc(p.name)}</div>`;
-  miniGrid(g.querySelector('canvas'), p, 108, 52);
-  document.body.appendChild(g); return g;
+  g.style.borderColor = p.color; g.innerHTML = '<canvas></canvas>';
+  miniGrid(g.querySelector('canvas'), p, 100, 38);
+  $('dev').appendChild(g); return g;
 }
 function moveGhost(e) {
-  const drag = DP.drag, comp = $('#comp'), cr = comp.getBoundingClientRect();
-  const t = Math.max(0, Math.min(1, (e.clientY - drag.y0) / Math.max(40, cr.top - drag.y0))), sc = drag.kind === 'card' ? 1 - 0.37 * t : 0.63;   // the card shrinks as it moves down
-  drag.g.style.left = (e.clientX - 58) + 'px'; drag.g.style.top = (e.clientY - 34) + 'px'; drag.g.style.transform = `scale(${sc})`;
+  const drag = DP.drag, comp = $('comp'), cr = comp.getBoundingClientRect(), dr = $('dev').getBoundingClientRect();
+  drag.g.style.left = (e.clientX - dr.left - 50) + 'px'; drag.g.style.top = (e.clientY - dr.top - 25) + 'px';
   const over = e.clientY > cr.top - 30 && e.clientY < cr.bottom + 30;
-  drag.g.classList.toggle('out', drag.kind === 'blk' && !over);
-  const m = $('#marker'); document.querySelectorAll('.blk.repl').forEach((b) => b.classList.remove('repl')); drag.target = null;
+  drag.g.style.transform = `scale(${over ? 0.55 : 0.85})`; drag.g.style.opacity = drag.kind === 'blk' && !over ? 0.5 : 1;
+  const m = $('marker'); drag.target = null;
   if (!over) { m.style.display = 'none'; drag.auto = 0; return; }
-  const comp2 = S.song.drums.comp, raw = (e.clientX - cr.left + comp.scrollLeft - 6) / SLOT, on = Math.floor(raw);
-  if (drag.kind === 'card' && comp2[on] && comp2[on].ph && raw - on > 0.2 && raw - on < 0.8) {
-    drag.target = { replace: on }; m.style.display = 'none';
-    const el = document.querySelector(`.blk[data-i="${on}"]`); if (el) el.classList.add('repl'); return;
-  }
-  const idx = Math.max(0, Math.min(comp2.length, Math.round(raw)));
+  const c2 = song().drums.comp, raw = (e.clientX - cr.left + comp.scrollLeft - 6) / SLOT, on = Math.floor(raw);
+  if (drag.kind === 'card' && c2[on] && c2[on].ph && raw - on > 0.2 && raw - on < 0.8) { drag.target = { replace: on }; m.style.display = 'block'; m.style.left = (6 + on * SLOT + SLOT / 2 - 2) + 'px'; return; }
+  const idx = clamp(Math.round(raw), 0, c2.length);
   drag.target = { insert: idx }; m.style.display = 'block'; m.style.left = (6 + idx * SLOT - 2) + 'px';
   drag.auto = e.clientX < cr.left + 36 ? -8 : e.clientX > cr.right - 36 ? 8 : 0;
 }
-function autoScroll() { if (!DP.drag) return; if (DP.drag.auto) $('#comp').scrollLeft += DP.drag.auto; requestAnimationFrame(autoScroll); }
+function autoScroll() { if (!DP.drag) return; if (DP.drag.auto) $('comp').scrollLeft += DP.drag.auto; requestAnimationFrame(autoScroll); }
 function endDrag() {
-  const dg = DP.drag; DP.drag = null; if (!dg) return; dg.g.remove(); const m = $('#marker'); if (m) m.style.display = 'none';
-  const s = S.song, comp = s.drums.comp; DP.selBlk = -1;
+  const dg = DP.drag; DP.drag = null; if (!dg) return; dg.g.remove(); const m = $('marker'); if (m) m.style.display = 'none';
+  const s = song(), comp = s.drums.comp; DP.selBlk = -1;
   if (dg.kind === 'card') {
-    if (!dg.target) return;
-    if (dg.target.replace !== undefined) { comp[dg.target.replace] = { p: dg.p }; say('Placeholder block replaced.'); }
-    else { comp.splice(dg.target.insert, 0, { p: dg.p }); CZ.trimPh(s); say(CZ.pat(s.drums, dg.p).name + ' added.'); }
+    if (!dg.target) { render(); return; }
+    if (dg.target.replace !== undefined) { comp[dg.target.replace] = { p: dg.p }; toast('Placeholder block replaced.'); }
+    else { comp.splice(dg.target.insert, 0, { p: dg.p }); CZ.trimPh(s); toast(CZ.pat(s.drums, dg.p).name + ' added.'); }
   } else {
     const b = comp[dg.i];
-    if (!dg.target) { comp.splice(dg.i, 1); CZ.fillPh(s); say('Removed.'); }
+    if (!dg.target) { comp.splice(dg.i, 1); CZ.fillPh(s); toast('Removed.'); }
     else if (dg.target.insert !== undefined) { let to = dg.target.insert; comp.splice(dg.i, 1); if (to > dg.i) to--; comp.splice(to, 0, b); }
   }
-  S.changed('drums'); render();
+  dch();
 }
 function attachCardDrag(el) {
   el.addEventListener('pointerdown', (e) => {
-    const t = e.target.closest('[data-pmenu],[data-ph],input');
+    const t = e.target.closest('[data-pmenu],[data-ph],input,.info');
     if (t) { if (t.dataset.pmenu) { e.preventDefault(); patMenu(+t.dataset.pmenu); } else if (t.dataset.ph) { e.preventDefault(); togglePh(+t.dataset.ph); } return; }
-    const id = +el.dataset.p, x0 = e.clientX, y0 = e.clientY, sl0 = $('#strip').scrollLeft; let mode = null;
+    const id = +el.dataset.p, x0 = e.clientX, y0 = e.clientY, strip = $('cards'), sl0 = strip.scrollLeft; let mode = null;
     try { el.setPointerCapture(e.pointerId); } catch (x) {}
-    const start = (ev) => { DP.drag = { kind: 'card', p: id, g: makeGhost(CZ.pat(S.song.drums, id)), y0: ev.clientY, auto: 0 }; moveGhost(ev); autoScroll(); };
+    const start = (ev) => { DP.drag = { kind: 'card', p: id, g: makeGhost(CZ.pat(song().drums, id)), auto: 0 }; moveGhost(ev); autoScroll(); };
     const hold = setTimeout(() => { if (!mode) { mode = 'drag'; start(e); } }, 320);
     const mv = (ev) => {
       const dx = ev.clientX - x0, dy = ev.clientY - y0;
       if (!mode && Math.hypot(dx, dy) > 8) { clearTimeout(hold); mode = Math.abs(dy) > Math.abs(dx) ? 'drag' : 'scroll'; if (mode === 'drag') start(ev); }
-      if (mode === 'scroll') $('#strip').scrollLeft = sl0 - dx;
+      if (mode === 'scroll') strip.scrollLeft = sl0 - dx;
       if (mode === 'drag' && DP.drag) moveGhost(ev);
     };
     const up = () => { clearTimeout(hold); el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up);
-      if (!mode) { S.song.drums.sel = id; render(); } else if (mode === 'drag') endDrag(); };
+      if (!mode) { song().drums.sel = id; render(); } else if (mode === 'drag') endDrag(); };
     el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
   });
 }
 function attachBlockDrag(el) {
   el.addEventListener('pointerdown', (e) => {
-    const i = +el.dataset.i, x0 = e.clientX, y0 = e.clientY, sl0 = $('#comp').scrollLeft; let mode = null; try { el.setPointerCapture(e.pointerId); } catch (x) {}
-    const start = (ev) => { el.classList.add('lift'); DP.drag = { kind: 'blk', i, p: S.song.drums.comp[i].p, g: makeGhost(CZ.pat(S.song.drums, S.song.drums.comp[i].p)), y0: ev.clientY - 200, auto: 0 }; moveGhost(ev); autoScroll(); };
+    const i = +el.dataset.i, x0 = e.clientX, y0 = e.clientY, comp = $('comp'), sl0 = comp.scrollLeft; let mode = null; try { el.setPointerCapture(e.pointerId); } catch (x) {}
+    const start = (ev) => { const b = song().drums.comp[i]; DP.drag = { kind: 'blk', i, p: b.p, g: makeGhost(CZ.pat(song().drums, b.p)), auto: 0 }; moveGhost(ev); autoScroll(); };
     const hold = setTimeout(() => { if (!mode) { mode = 'drag'; start(e); } }, 300);
     const mv = (ev) => {
       if (!mode && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8) { clearTimeout(hold); mode = Math.abs(ev.clientY - y0) > Math.abs(ev.clientX - x0) ? 'drag' : 'scroll'; if (mode === 'drag') start(ev); }
-      if (mode === 'scroll') $('#comp').scrollLeft = sl0 - (ev.clientX - x0);
+      if (mode === 'scroll') comp.scrollLeft = sl0 - (ev.clientX - x0);
       if (mode === 'drag' && DP.drag) moveGhost(ev);
     };
     const up = () => { clearTimeout(hold); el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up);
