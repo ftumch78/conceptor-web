@@ -392,9 +392,9 @@ function lanesHTML(kind) {
   const w = Math.ceil(L * PXS) + 40;
   const stepT = PXS > 20 ? 1 : PXS > 8 ? 5 : PXS > 4 ? 10 : 30;
   let ruler = ''; for (let t = 0; t <= L; t += stepT) ruler += `<span style="left:${t * PXS}px">${fmt(t)}</span>`;
-  let h = `<div class="lanes" data-keep="lanes-${kind}"><div style="position:relative;width:${w + HW}px">
+  let h = `<div class="lanes" data-keep="lanes-${kind}"><div style="position:relative;width:${w + HW}px;min-width:100%">
     <div style="display:flex;position:sticky;top:0;z-index:6"><div class="lcorner" style="width:${HW}px">Cursor <b id="curLab" style="color:var(--gold)">${fmtC(S.now())}</b> ${kind === 'full' ? ii('cursor') : ''}</div>
-    <div class="ruler" id="ruler" style="width:${w}px" data-n="Ruler: tap or drag to move the cursor">${ruler}</div></div><div style="position:relative">`;
+    <div class="ruler" id="ruler" style="width:${w}px;flex:1 0 auto" data-n="Ruler: tap or drag to move the cursor">${ruler}</div></div><div style="position:relative">`;
   // drum lane: the Pattern Compile row as blocks
   const d = s.drums, sel = (id) => kind === 'full' && String(ui.selT) === String(id);
   const head = (id) => {
@@ -406,10 +406,10 @@ function lanesHTML(kind) {
   };
   let blocks = '', at = 0;
   d.comp.forEach((b) => { const p = CZ.pat(d, b.p); if (!p) return; const sec = CZ.patSec(s, p); blocks += `<div class="clip" style="left:${at * PXS}px;width:${Math.max(2, sec * PXS - 1)}px;background:${p.color}${b.ph ? '14' : '29'};opacity:${d.ch.mute ? 0.35 : 1}"><div class="tt" style="background:${p.color}c7">${b.ph ? 'Placeholder' : esc(p.name)}</div></div>`; at += sec; });
-  h += `<div class="lane ${sel('d') ? 'sel' : ''} ${kind === 'mini' ? 'mini' : ''}">${head('d')}<div class="larea" style="width:${w}px" onclick="ui.selT='d';${kind === 'full' ? 'render()' : ''}">${blocks}</div></div>`;
+  h += `<div class="lane ${sel('d') ? 'sel' : ''} ${kind === 'mini' ? 'mini' : ''}">${head('d')}<div class="larea" style="width:${w}px;flex:1 0 auto" onclick="ui.selT='d';${kind === 'full' ? 'render()' : ''}">${blocks}</div></div>`;
   tracksShown().forEach((t, i) => {
     h += `<div class="lane ${sel(i) ? 'sel' : ''} ${kind === 'mini' ? 'mini' : ''}">${head(i)}
-      <div class="larea" style="width:${w}px" onclick="ui.selT=${i};${kind === 'full' ? 'render()' : ''}">${t.audio ? `<div class="clip" style="left:0;width:${t.audio.length / S.sr * PXS}px;background:${colOf(i)}29;opacity:${t.mute ? 0.35 : 1}"><div class="tt" style="background:${colOf(i)}c7">${esc(t.name)}${t.audioR ? ' · stereo' : ''}${t.gain ? ` · ${t.gain > 0 ? '+' : ''}${t.gain} dB` : ''}</div><canvas data-wave="${i}"></canvas></div>` : ''}</div></div>`;
+      <div class="larea" style="width:${w}px;flex:1 0 auto" onclick="ui.selT=${i};${kind === 'full' ? 'render()' : ''}">${t.audio ? `<div class="clip" style="left:0;width:${t.audio.length / S.sr * PXS}px;background:${colOf(i)}29;opacity:${t.mute ? 0.35 : 1}"><div class="tt" style="background:${colOf(i)}c7">${esc(t.name)}${t.audioR ? ' · stereo' : ''}${t.gain ? ` · ${t.gain > 0 ? '+' : ''}${t.gain} dB` : ''}</div><canvas data-wave="${i}"></canvas></div>` : ''}</div></div>`;
   });
   return h + `<div class="cursor" id="ecur" style="left:${S.now() * PXS + HW}px"></div></div></div></div>`;
 }
