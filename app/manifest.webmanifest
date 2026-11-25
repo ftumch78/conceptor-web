@@ -1,11 +1,11 @@
 {
-  "name": "Conceptor",
+  "name": "Conceptor - Light",
   "short_name": "Conceptor",
-  "description": "Record ideas: twelve tracks, with amps, pedals, effects, drums and mastering built in.",
+  "description": "Record ideas on a phone: four tracks, with amps, pedals, effects and drums built in.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "orientation": "landscape",
+  "orientation": "any",
   "background_color": "#1B1C1F",
   "theme_color": "#050506",
   "icons": [

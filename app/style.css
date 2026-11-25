@@ -270,3 +270,102 @@ body.phone .clock{min-width:78px;padding:4px 6px}
 /* dark scroll bars */
 *{scrollbar-width:thin;scrollbar-color:#4a4c53 transparent}
 ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#4a4c53;border-radius:4px}::-webkit-scrollbar-track{background:transparent}
+
+/* ------------------------------------------------------------------ 0.4.4: Conceptor - Light and Conceptor - Heavy */
+body.ed-light .rotate{display:none!important}
+.edn{color:var(--mint);letter-spacing:2px} body.ed-heavy .edn{color:var(--ink)}
+/* intro: one screen at a time */
+.intro{flex:1;min-height:0;overflow:auto;display:flex;justify-content:center;padding:18px 16px}
+.ibox{width:100%;max-width:1000px;display:flex;flex-direction:column;gap:12px;margin:auto 0}
+body.ed-light .ibox{max-width:560px}
+.ihead{display:flex;align-items:center;gap:10px}
+.ibrand{color:var(--gold);font-weight:bold;letter-spacing:3px;font-size:13px} .ibrand b{color:var(--mint)} body.ed-heavy .ibrand b{color:var(--ink)}
+.istep{color:var(--dim);font-size:11px;letter-spacing:2px}
+.idots{display:flex;gap:5px} .idots span{width:22px;height:5px;border-radius:3px;background:var(--line)} .idots span.on{background:var(--gold)}
+.intro h2{color:var(--gold);font-size:22px;display:flex;align-items:center;gap:8px;margin-top:4px}
+.dim2{color:#A2A4AA;font-size:14px;line-height:1.45}
+.ihero{display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center;padding:10px 0}
+.iname{color:var(--gold);font-weight:bold;font-size:26px;letter-spacing:4px;display:flex;flex-direction:column;gap:6px} .iname small{color:var(--mint);font-size:16px;letter-spacing:6px;font-weight:normal}
+.icard{background:var(--panel);border-radius:14px;padding:16px;text-align:left;display:flex;flex-direction:column;gap:10px;font-size:15px;line-height:1.45}
+.ihx{display:inline-flex;align-items:center;justify-content:center;flex:none;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%)}
+.iopt{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:var(--panel);color:var(--ink);border:2px solid transparent;border-radius:14px;padding:12px 14px;cursor:pointer;font-family:inherit}
+.iopt b{display:block;font-size:17px} .iopt small{display:block;font-size:13px;color:#A2A4AA;margin-top:3px;line-height:1.35}
+.iopt.sel{border-color:var(--mint)} body.ed-heavy .iopt.sel{border-color:var(--gold)}
+.iopt.sm{padding:9px 12px;border-radius:10px} .iopt.sm b{font-size:14px;font-weight:normal}
+.iopt:disabled{opacity:.45;cursor:default}
+.iopt:hover:not(:disabled){filter:brightness(1.1)}
+.ichoices{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.ichoice{display:flex;flex-direction:column;align-items:flex-start;gap:10px;text-align:left;background:var(--panel);color:var(--ink);border:2px solid var(--line);border-radius:18px;padding:22px;cursor:pointer;font-family:inherit;font-size:14px;line-height:1.45}
+.ichoice span{color:#B6B8BE} .ichoice .ict{font-size:22px} .ichoice.sel{border-color:var(--gold)}
+.icols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.iblock{background:var(--panel);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.iblock .iopt{background:var(--bg)}
+.ilvl{display:flex;align-items:center;gap:10px;font-size:13px} .ilvl span{width:70px;flex:none} .ilvl .hm{flex:1;height:10px}
+.ifold{display:flex;align-items:center;gap:10px;background:var(--panel);border-radius:12px;padding:10px 12px;flex-wrap:wrap} .ifold b{flex:1;font:13px Menlo,Consolas,monospace}
+.istart{display:grid;grid-template-columns:1fr;gap:10px}
+body.ed-heavy .istart{grid-template-columns:repeat(4,1fr)} body.ed-heavy .iopt.big{flex-direction:column;text-align:center;padding:26px 16px;gap:14px;height:100%}
+.inote{display:flex;gap:10px;align-items:flex-start;background:var(--panel);border-radius:12px;padding:10px 12px;font-size:13px;color:#B6B8BE;line-height:1.45}
+.inav{display:flex;gap:10px;justify-content:flex-end;margin-top:6px}
+.inb{height:48px!important;font-size:16px!important;padding:0 26px!important;min-width:120px}
+body.port .inav .inb{flex:1}
+body.port .ichoices,body.port .icols{grid-template-columns:1fr}
+/* main screen: palette on top, faders below */
+.edmix{flex:1;min-height:0;display:flex;flex-direction:column}
+.edtop{flex:none;display:flex;min-height:0;overflow:hidden}
+.pal{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0}
+.prow{display:flex;gap:var(--g)} .prow+.prow{margin-top:calc(var(--hh) * -0.24 + var(--g) * 0.4)}
+.phx{width:var(--hw);height:var(--hh);clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);border:0;color:#1B1C1F;font:bold var(--fs)/1.15 Arial,Helvetica,sans-serif;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 calc(var(--hw) * 0.09);cursor:pointer;flex:none}
+.phx:hover{filter:brightness(1.1)} .phx:active{filter:brightness(.9)} .phx:disabled{opacity:.35;cursor:default}
+.edlow{flex:1;min-height:0;display:flex;flex-direction:column;background:#121316;border-top:1px solid var(--line)}
+.edlab{display:flex;align-items:center;gap:6px;padding:6px 8px 0;color:var(--dim);font-size:10px;letter-spacing:1.5px;flex:none}
+.lstrips{flex:1;min-height:0;display:flex;gap:5px;padding:6px 6px 8px}
+.ls{flex:1 1 0;min-width:0;background:var(--panel);border-radius:10px;display:flex;flex-direction:column;align-items:center;gap:5px;padding:0 4px 6px;overflow:hidden}
+.ls .tab{align-self:stretch;height:4px;margin:0 -4px;flex:none}
+.ls .lnm{font-size:11px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;cursor:pointer;flex:none}
+.ls .b.s{width:100%;flex:none} .ls .fxb{background:linear-gradient(#5a4820,#4A3B19);color:var(--gold);border-color:#6A5626}
+.ls .kwrap{flex:none;height:28px;display:flex;align-items:center} .ls .kwrap .kl,.ls .kwrap .kv,.ls .kwrap br{display:none}
+.ls .kpad,.ls .mspad{height:28px;flex:none} .ls .mspad{height:20px} .ls .b2pad{height:20px;flex:none} .ls .armpad{height:28px;flex:none}
+.ls .ms{display:flex;gap:4px;flex:none}
+.ls .arm{width:28px;height:28px;border-radius:50%;border:1px solid #4A4C53;background:linear-gradient(#34353B,#2A2B30);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;padding:0}
+.ls .arm i{width:10px;height:10px;border-radius:50%;background:var(--red)} .ls .arm.on{background:linear-gradient(#ec3b41,#cc1f26);border-color:var(--red)} .ls .arm.on i{background:#fff}
+.ls .fz{flex:1;min-height:40px;display:flex;justify-content:center;gap:5px;align-items:stretch;width:100%}
+.ls .db{font-size:9px;color:var(--dim);flex:none;white-space:nowrap}
+.ls.master{border:1px solid rgba(226,191,106,.5)}
+body.computer .ls .lnm{font-size:13px} body.computer .ls .db{font-size:11px}
+/* top bar, Light */
+.ltop{gap:6px!important;overflow:hidden!important}
+.ltop .lbr{display:flex;flex-direction:column;min-width:0;gap:1px;flex:0 1 auto} .ltop .brand{font-size:10px} .ltop .song{font-size:11px;max-width:130px}
+body.port .ltop{padding:4px 6px!important} body.port .ltop .clock{min-width:70px;font-size:12px;padding:4px 6px} body.port .ltop .b.t{width:32px;height:32px}
+/* Heavy: smaller hexagons beside the All Waves overview, the full strips below */
+.edmix.heavy .palbox{flex:none;display:flex;min-width:0}
+.edmix.heavy .hov{flex:1;min-width:0;display:flex;flex-direction:column;border-left:1px solid var(--line);background:#121316}
+.edmix.heavy .hov .lanes{flex:1}
+.hmixer{flex:1;min-height:0;overflow:hidden!important;gap:5px!important;padding:6px!important}
+.hmixer .strip{flex:1 1 0!important;width:auto!important;min-width:0}
+.hmixer .strip.add{flex:0 0 64px!important}
+.hmixer>.sp{display:none}
+/* Lt. Joe Bookman: Heavy and Light song folders */
+.kinds{display:flex;gap:8px;margin-bottom:8px}
+.kind{flex:1;max-width:220px;height:54px;border-radius:12px;border:2px solid var(--panel2);background:var(--panel);color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;font-family:inherit}
+.kind b{font-size:14px} .kind small{font-size:11px;color:var(--dim)} .kind.sel.heavy{border-color:var(--gold)} .kind.sel.light{border-color:var(--mint)} .kind:disabled{opacity:.5;cursor:default}
+/* portrait phone (Light) */
+body.port .split{flex-direction:column}
+body.port .split .cats{width:auto!important;max-height:36%;border-right:0;border-bottom:1px solid var(--line)}
+body.port .sheet{left:2%;right:2%;top:3%;bottom:3%}
+body.port #dlg .box{width:94vw!important;max-width:94vw}
+.ihead{white-space:nowrap} .ihead .ibrand{overflow:hidden;text-overflow:ellipsis}
+body.port .ibrand{font-size:11px;letter-spacing:2px} body.port .istep{font-size:10px;letter-spacing:1px} body.port .idots span{width:14px}
+.ls .ms .b.s.r{width:18px;height:18px;font-size:8px}
+.hmixer .strip{padding:0 3px 5px!important}
+.hmixer .strip .b.s{height:18px;font-size:8px;padding:0 4px}
+.hmixer .strip .b.s.r{width:18px}
+.hmixer .strip .btns{gap:2px}
+.hmixer .strip .inp{font-size:8px}
+.hmixer .strip .tab{width:calc(100% + 6px)}
+.hmixer .strip{overflow:hidden}
+.hmixer .strip .sc .row{flex-wrap:nowrap;min-width:0}
+.hmixer .strip .inp{min-width:0;flex:1 1 auto;padding:2px 3px}
+.hmixer .strip .knob svg{width:18px;height:18px}
+.hmixer .sbody{flex-direction:column;align-items:stretch}
+.hmixer .sc,body.computer .hmixer .sc{width:100%!important;flex:none}
+.hmixer .strip .fz{flex:1;min-height:60px}

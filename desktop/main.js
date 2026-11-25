@@ -58,7 +58,7 @@ function smokeTest(out) {
     const js = `(async () => {
       const r = { version: CZ.VERSION, secure: window.isSecureContext, folderSync: typeof window.showDirectoryPicker, mic: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) };
       try { await S.startAudio(); r.audio = S.ctx.state + ', ' + S.ctx.sampleRate + ' Hz'; } catch (e) { r.audio = 'error: ' + e.message; }
-      try { await S.newSong('Smoke test'); r.song = S.song.name; S.song.mode = 'polished'; ui.screen = 'mix'; render(); } catch (e) { r.song = 'error: ' + e.message; }
+      try { await S.newSong('Smoke test'); r.song = S.song.name; S.song.mode = 'polished'; S.song.kind = 'heavy'; ui.screen = 'mix'; render(); r.edition = ED.v + (CZ.DESKTOP ? ' (desktop app)' : ''); } catch (e) { r.song = 'error: ' + e.message; }
       try { const sr = S.sr || 48000, n = sr * 4, a = new Float32Array(n); for (let i = 0; i < n; i++) a[i] = 0.4 * Math.sin(2 * Math.PI * 220 * i / sr);
             S.song.tracks[0].audio = a; S.song.tracks[0].name = 'Guitar'; S.song.tracks[0].fx.pedals[1].on = true; S.song.tracks[0].fx.amp.on = true; S.changed('audio'); render(); r.track = 'ok'; } catch (e) { r.track = 'error: ' + e.message; }
       try { const x = await S.exportFile({ track: -1, withFx: true, format: 0, start: 0, end: 0, channelsOnly: true }); let pk = 0; for (const v of x.channels[0]) pk = Math.max(pk, Math.abs(v)); r.mixPeak = pk.toFixed(3); } catch (e) { r.mixPeak = 'error: ' + e.message; }

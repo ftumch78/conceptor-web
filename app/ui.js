@@ -133,7 +133,8 @@ function go(s) {
 function render() {
   const keep = Object.assign({}, KEEP, saveScroll());
   const A = $('app');
-  if (ui.screen === 'welcome') A.innerHTML = welcome();
+  if (ui.screen === 'intro') A.innerHTML = introHTML();
+  else if (ui.screen === 'welcome') A.innerHTML = welcome();
   else if (ui.screen === 'songs') A.innerHTML = songsScreen();
   else if (ui.screen === 'mode') A.innerHTML = modeScreen();
   else A.innerHTML = topBar() + `<div class="main">${screens[ui.screen]()}</div>`;
@@ -385,9 +386,9 @@ function peaksFor(t) {
   return p.pk;
 }
 let PXS = 5;
-function lanesHTML(kind) {
+function lanesHTML(kind, availW) {
   const s = song(), L = Math.max(30, S.length() + 5), HW = kind === 'mini' ? 96 : (document.body.classList.contains('computer') ? 300 : 250);
-  const avail = Math.max(200, $('app').clientWidth - HW - 12);
+  const avail = Math.max(200, (availW || $('app').clientWidth) - HW - 12);
   PXS = clamp(avail / L, 2, 40);
   const w = Math.ceil(L * PXS) + 40;
   const stepT = PXS > 20 ? 1 : PXS > 8 ? 5 : PXS > 4 ? 10 : 30;
@@ -544,15 +545,15 @@ let WE = null;
 function openWave(i, tool) {
   const t = song().tracks[i]; if (!t.audio) { toast('That track is empty.'); return; }
   if (S.playing) S.stop();
-  WE = { i, tool: tool || 'trim', a: 0, b: t.audio.length, paint: null, gain: t.gain || 0, undo: [], cur: -1 };
-  openPop(`WAVE EDIT · ${esc(t.name).toUpperCase()}`, waveBody, { tip: 'wave', after: () => drawWave(), onClose: () => { WE = null; } });
+  WE = { i, tool: tool || (isLight() ? 'sil' : 'trim'), a: 0, b: t.audio.length, paint: null, gain: t.gain || 0, undo: [], cur: -1, spot: t.spot ? t.spot.slice() : null };
+  openPop(`${isLight() ? 'WAVE' : 'WAVE EDIT'} · ${esc(t.name).toUpperCase()}`, waveBody, { tip: 'wave', after: () => drawWave(), onClose: () => { WE = null; } });
 }
 function waveBody() {
-  const w = WE, n = song().tracks[w.i].audio.length, pending = (w.tool === 'trim' && (w.a > 0 || w.b < n)) || (w.tool === 'sil' && w.paint) || (w.tool === 'gain' && w.gain !== (song().tracks[w.i].gain || 0));
-  return `<div class="tabs">${B('Trim', "WE.tool='trim';WE.paint=null;drawPop()", 's ' + (w.tool === 'trim' ? 'on' : ''), 'data-n="Trim: drag the two handles"')}${B('Insert Silence', "WE.tool='sil';drawPop()", 's ' + (w.tool === 'sil' ? 'on' : ''), 'data-n="Insert Silence: paint over a part"')}${B('Clip Gain', "WE.tool='gain';drawPop()", 's ' + (w.tool === 'gain' ? 'on' : ''), 'data-n="Clip Gain: level of the whole clip"')}
+  const w = WE, t0 = song().tracks[w.i], n = t0.audio.length, pending = (w.tool === 'trim' && (w.a > 0 || w.b < n)) || (w.tool === 'sil' && w.paint) || (w.tool === 'gain' && w.gain !== (t0.gain || 0)) || (w.tool === 'spot' && w.spot && w.spot[1] > w.spot[0] && JSON.stringify(w.spot) !== JSON.stringify(t0.spot || null));
+  return `<div class="tabs">${isLight() ? '' : B('Trim', "WE.tool='trim';WE.paint=null;drawPop()", 's ' + (w.tool === 'trim' ? 'on' : ''), 'data-n="Trim: drag the two handles"')}${B('Insert Silence', "WE.tool='sil';drawPop()", 's ' + (w.tool === 'sil' ? 'on' : ''), 'data-n="Insert Silence: paint over a part"')}${isLight() ? B('Drop In spots', "WE.tool='spot';WE.paint=null;drawPop()", 's ' + (w.tool === 'spot' ? 'on' : ''), 'data-n="Drop In spots: tap IN, then OUT"') : ''}${B(isLight() ? 'Gain' : 'Clip Gain', "WE.tool='gain';drawPop()", 's ' + (w.tool === 'gain' ? 'on' : ''), 'data-n="Gain: level of the whole track"')}
     <span class="sp"></span>${B(S.lis ? STOPI + ' Stop' : PLAYI + ' Preview', 'wePreview()', 's gplay ' + (S.lis ? 'on' : ''), 'data-n="Preview: listen to the result"')}${B('Undo', 'weUndo()', 's', (w.undo.length ? '' : 'disabled ') + 'data-n="Undo the last change"')}${B('Clear', 'weClear()', 's', (pending ? '' : 'disabled ') + 'data-n="Clear: forget the change not applied yet"')}</div>
     <canvas class="wv" id="wv" width="1400" height="260"></canvas>
-    <p class="dim" style="margin-top:5px">${{ trim: 'Drag the two gold handles. Apply removes everything outside them. The part kept stays where it is in the song.', sil: 'Paint over the part to silence with a finger or the mouse, like an eraser. Preview it, then Apply.', gain: 'Turn the knob to make the whole clip louder or quieter, then Apply.' }[w.tool]}</p>
+    <p class="dim" style="margin-top:5px">${{ trim: 'Drag the two gold handles. Apply removes everything outside them. The part kept stays where it is in the song.', sil: 'Paint over the part to silence with a finger or the mouse, like an eraser. Preview it, then Apply.', gain: 'Turn the knob to make the whole clip louder or quieter, then Apply.', spot: 'Tap the wave to set IN, then tap again to set OUT. Apply keeps them. Drop In then records from IN and stops at OUT by itself.' + (t0.spot ? ' Now: IN ' + fmtC(t0.spot[0]) + ', OUT ' + fmtC(t0.spot[1]) + '.' : '') }[w.tool]}${w.tool === 'spot' ? ii('spots') : ''}</p>
     <div class="row" style="margin-top:8px;flex-wrap:wrap">${w.tool === 'gain' ? `<span id="cgk"></span><span class="dim">-24 dB to +12 dB</span>` : ''}${B('Apply', 'weApply()', 'on', pending ? '' : 'disabled')}<span class="dim">Clip gain now: ${(song().tracks[w.i].gain || 0) > 0 ? '+' : ''}${song().tracks[w.i].gain || 0} dB</span></div>`;
 }
 // the audio as it would be after the pending change
@@ -575,6 +576,7 @@ function drawWave() {
   }
   if (w.tool === 'sil' && w.paint) { g.fillStyle = 'rgba(227,36,43,.22)'; g.fillRect(X(w.paint[0]), 0, X(w.paint[1] - w.paint[0]), H); }
   if (w.tool === 'trim') [w.a, w.b].forEach((k) => { g.fillStyle = '#E2BF6A'; g.fillRect(X(k) - 2, 0, 4, H); g.fillRect(X(k) - 12, H / 2 - 20, 24, 40); });
+  if (w.spot) w.spot.forEach((sec, j) => { if (sec == null || (j === 1 && !(w.spot[1] > w.spot[0]))) return; const x = X(sec * sr); g.fillStyle = '#FF9A1F'; g.fillRect(x - 2, 0, 4, H); g.font = 'bold 22px Arial'; g.fillText(j ? 'OUT' : 'IN', x + 6, 52); });
   const lp = S.listenPos(); if (lp >= 0) { g.fillStyle = '#fff'; g.fillRect(X(lp * sr), 0, 3, H); }
   g.fillStyle = '#8C8E95'; g.font = '20px Arial'; g.textAlign = 'left'; g.fillText('0:00', 8, 24); g.textAlign = 'right'; g.fillText(fmt(n / sr), W - 8, 24); g.textAlign = 'left';
   if (w.tool === 'trim') { g.fillStyle = '#E2BF6A'; g.fillText('Start ' + fmtC(w.a / sr), 70, 24); g.textAlign = 'right'; g.fillText('End ' + fmtC(w.b / sr), W - 80, 24); g.textAlign = 'left'; }
@@ -583,6 +585,7 @@ function drawWave() {
     if (w.tool === 'gain') return;
     try { c.setPointerCapture(e.pointerId); } catch (x) {}
     const ix = (ev) => { const r = c.getBoundingClientRect(); return clamp(Math.round((ev.clientX - r.left) / r.width * n), 0, n); };
+    if (w.tool === 'spot') { const sec = ix(e) / sr; if (!w.spot || w.spot[1] > w.spot[0]) w.spot = [sec, -1]; else if (sec > w.spot[0]) w.spot = [w.spot[0], sec]; else w.spot = [sec, w.spot[0]]; drawPop(); return; }
     const i0 = ix(e), hnd = Math.abs(i0 - w.a) < Math.abs(i0 - w.b) ? 'a' : 'b', minLen = Math.round(sr * 0.05);
     if (w.tool === 'sil') w.paint = w.paint ? [Math.min(w.paint[0], i0), Math.max(w.paint[1], i0 + 1)] : [i0, i0 + 1];
     const mv = (ev) => { const i = ix(ev); if (w.tool === 'trim') { if (hnd === 'a') w.a = clamp(i, 0, w.b - minLen); else w.b = clamp(i, w.a + minLen, n); } else w.paint = [Math.min(w.paint[0], i), Math.max(w.paint[1], i + 1)]; drawWave(); };
@@ -592,7 +595,8 @@ function drawWave() {
 function weApply() {
   const w = WE, t = song().tracks[w.i];
   w.undo.push({ audio: t.audio, audioR: t.audioR, gain: t.gain || 0 });
-  if (w.tool === 'gain') { t.gain = w.gain; toast('Clip gain set.'); }
+  if (w.tool === 'gain') { t.gain = w.gain; toast('Gain set.'); }
+  else if (w.tool === 'spot') { w.undo.pop(); t.spot = w.spot.slice(); toast('Drop In spots set: IN ' + fmtC(t.spot[0]) + ', OUT ' + fmtC(t.spot[1]) + '.'); }
   else {
     const edit = (c) => { if (!c) return c; let x = c.slice(); if (w.tool === 'trim') { x.fill(0, 0, w.a); x = x.slice(0, w.b); } else if (w.paint) x.fill(0, w.paint[0], w.paint[1]); return x; };
     t.audio = edit(t.audio); t.audioR = edit(t.audioR);
@@ -777,7 +781,7 @@ const meterBuf = new Float32Array(256);
 function peak(an) { if (!an) return 0; an.getFloatTimeDomainData(meterBuf); let m = 0; for (const x of meterBuf) m = Math.max(m, Math.abs(x)); return m; }
 const lvl = (p) => clamp((20 * Math.log10(Math.max(p, 1e-5)) + 60) / 66 * 100, 0, 100);
 function live() {
-  if (!S.song) return;
+  if (!S.song) { if (ui.screen === 'intro') [1, 2].forEach((k) => { const p = S.inputLevel ? S.inputLevel(k - 1) : 0, e = $('io' + k); if (e) e.style.width = lvl(p) + '%'; }); if (typeof umLive === 'function') umLive(); tunerLive(); return; }
   const c = $('clock');
   if (c) {   // A2: runs while recording, red; orange "REC IN" during the Drop In run-up
     const wait = S.countIn();
@@ -792,7 +796,7 @@ function live() {
   }
   const cu = $('ecur'); if (cu) { const hw = cu.parentElement.parentElement.querySelector('.lcorner'); cu.style.left = (S.now() * PXS + (hw ? hw.offsetWidth : 0)) + 'px'; }
   const cl = $('curLab'); if (cl) cl.textContent = fmtC(S.now());
-  if (ui.screen === 'io') [1, 2].forEach((k) => { const p = S.inputLevel(k - 1), e = $('io' + k), t = $('io' + k + 't'); if (e) e.style.width = lvl(p) + '%'; if (t) t.textContent = S.micNode ? (p < 1e-4 ? '-inf' : (20 * Math.log10(p)).toFixed(0) + ' dB') : '–'; });
+  if (ui.screen === 'io' || ui.screen === 'intro') [1, 2].forEach((k) => { const p = S.inputLevel(k - 1), e = $('io' + k), t = $('io' + k + 't'); if (e) e.style.width = lvl(p) + '%'; if (t) t.textContent = S.micNode ? (p < 1e-4 ? '-inf' : (20 * Math.log10(p)).toFixed(0) + ' dB') : '–'; });
   if (WE && S.lis) drawWave();
   if (EX && S.lis && $('exw')) { EX.cur = S.listenPos() / exLen(); exDraw(); }
   if (typeof drumLive === 'function') drumLive();
@@ -810,8 +814,9 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && S.s
 // ------------------------------------------------------------------ start
 function sizeClass() { document.body.classList.toggle('computer', window.innerHeight >= 560 && window.innerWidth >= 900); document.body.classList.toggle('phone', !(window.innerHeight >= 560 && window.innerWidth >= 900)); }
 let rsT = null;
-window.addEventListener('resize', () => { sizeClass(); clearTimeout(rsT); rsT = setTimeout(() => { if (['mix', 'edit'].includes(ui.screen)) render(); }, 200); });
+window.addEventListener('resize', () => { sizeClass(); clearTimeout(rsT); rsT = setTimeout(() => { if (['mix', 'edit', 'intro'].includes(ui.screen)) render(); }, 200); });
 (async function start() {
+  if (document.readyState === 'loading') await new Promise((r) => document.addEventListener('DOMContentLoaded', r));
   sizeClass(); setHandHold(handHold());
   S.inputId = localStorage.getItem('cz.inputId') || null; S.outputId = localStorage.getItem('cz.outputId') || '';
   const d = $('dev');
@@ -822,9 +827,7 @@ window.addEventListener('resize', () => { sizeClass(); clearTimeout(rsT); rsT = 
   d.addEventListener('pointerup', () => clearTimeout(holdT));
   d.addEventListener('contextmenu', (e) => { if (isPhone()) e.preventDefault(); });
   await S.restoreFolder();
-  const last = localStorage.getItem('cz.last');
-  if (localStorage.getItem('cz.intro') && last && (await S.load(last).catch(() => false))) ui.screen = 'mix';
-  else if (localStorage.getItem('cz.intro')) { await S.newSong(null); ui.screen = 'mix'; }
+  ui.screen = 'intro'; IN.step = 0;   // 0.4.4: the intro screens show every time the app opens
   render();
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
