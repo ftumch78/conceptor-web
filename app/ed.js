@@ -194,7 +194,7 @@ function palette(items, W, H, maxHw = 128) {
   let best = null;
   for (let r = 1; r <= 6; r++) {
     let a = 1; while (Math.ceil(r / 2) * a + Math.floor(r / 2) * (a - 1) < n) a++;   // rows go a, a-1, a, ...
-    const hw = Math.min((W - (a - 1) * gap - 8) / a, (H - 8) / (1.15 * (1 + (r - 1) * 0.76)));
+    const hw = Math.min((W - (a - 1) * gap - 8) / a, (H - 22) / (1.15 * (1 + (r - 1) * 0.76)));
     if (!best || (best.hw < maxHw && hw > best.hw + 0.5)) best = { r, a, hw };
   }
   const hw = Math.max(40, Math.min(best.hw, maxHw)), hh = hw * 1.15, rows = [];
