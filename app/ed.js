@@ -12,7 +12,13 @@ function applyEd() {
   document.body.classList.toggle('ed-light', isLight()); document.body.classList.toggle('ed-heavy', !isLight());
   document.title = edName(ED.v);
 }
-function portClass() { document.body.classList.toggle('port', window.innerHeight > window.innerWidth); }
+function portClass() {
+  document.body.classList.toggle('port', window.innerHeight > window.innerWidth);
+  // a phone is upright only: held sideways it shows "Turn the phone upright."
+  const sideways = isLight() && !CZ.DESKTOP && isPhone() && window.innerWidth > window.innerHeight;
+  document.body.classList.toggle('phoneside', sideways);
+  const r = document.querySelector('.rotate'); if (r && !r.dataset.up) { r.dataset.up = '1'; r.innerHTML = r.innerHTML.replace('Turn the phone sideways.', 'Turn the phone upright.').replace('Conceptor works in landscape.', 'Conceptor - Light works upright on a phone.'); }
+}
 window.addEventListener('resize', portClass);
 
 // A song is Light or Heavy. Older songs: Light if they fit inside the Light limits.

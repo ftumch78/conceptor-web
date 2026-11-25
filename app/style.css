@@ -273,6 +273,7 @@ body.phone .clock{min-width:78px;padding:4px 6px}
 
 /* ------------------------------------------------------------------ 0.4.4: Conceptor - Light and Conceptor - Heavy */
 body.ed-light .rotate{display:none!important}
+body.ed-light.phoneside .rotate{display:flex!important}
 .edn{color:var(--mint);letter-spacing:2px} body.ed-heavy .edn{color:var(--ink)}
 /* intro: one screen at a time */
 .intro{flex:1;min-height:0;overflow:auto;display:flex;justify-content:center;padding:18px 16px}
